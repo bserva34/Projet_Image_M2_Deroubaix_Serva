@@ -8,9 +8,10 @@ dataset_path = 'BDD/40_personnes_train'
 # Initialiser le reconnaisseur LBPH
 recognizer = cv2.face.LBPHFaceRecognizer_create()
 
-# Initialiser les listes pour stocker les images et leurs labels
+# Initialiser les listes pour stocker les images, leurs labels et les chemins des images
 images = []
 labels = []
+image_paths = []  # Liste pour stocker les chemins des images
 
 # Associer chaque dossier de personne à un label numérique
 label = 0  # Initialisation du label
@@ -25,8 +26,10 @@ for person_name in sorted(os.listdir(dataset_path)):
             if image is not None:
                 images.append(image)
                 labels.append(label)
+                image_paths.append(image_path)  # Enregistrer le chemin de l'image
+                label += 1 
         print(f"Données ajoutées pour {person_name} avec le label {label}")
-        label += 1  # Incrémenter le label pour la prochaine personne
+         # Incrémenter le label pour la prochaine personne
 
 # Vérifier si les listes ne sont pas vides
 if len(images) == 0 or len(labels) == 0:
@@ -44,3 +47,5 @@ else:
     recognizer.save(model_path)
 
     print("Modèle LBPH entraîné avec succès.")
+    # Enregistrer les chemins des images pour référence future
+    np.save('image_paths.npy', image_paths)
