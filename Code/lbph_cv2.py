@@ -29,9 +29,7 @@ for person_name in sorted(os.listdir(dataset_path)):
                 image_paths.append(image_path)  # Enregistrer le chemin de l'image
                 label += 1 
         print(f"Données ajoutées pour {person_name} avec le label {label}")
-         # Incrémenter le label pour la prochaine personne
 
-# Vérifier si les listes ne sont pas vides
 if len(images) == 0 or len(labels) == 0:
     print("Erreur : aucune donnée d'entraînement trouvée.")
 else:
