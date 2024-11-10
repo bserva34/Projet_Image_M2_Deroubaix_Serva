@@ -23,6 +23,7 @@ with open(output_dat_file, 'w') as dat_file:
         person_path = os.path.join(dataset_path, person_name)
         if os.path.isdir(person_path):
             person_images = []  # Liste pour stocker les images de cette personne
+            person_labels = []  # Liste pour les labels des images de cette personne
             person_histograms = []  # Liste pour stocker les vecteurs caractéristiques
 
             for file_name in os.listdir(person_path):
@@ -31,17 +32,24 @@ with open(output_dat_file, 'w') as dat_file:
                 if image is not None:
                     # Ajouter l'image à la liste de la personne
                     person_images.append(image)
+                    person_labels.append(cpt)  # Assigner un label unique pour chaque personne (cpt)
 
-                    # Extraire le vecteur caractéristique LBPH de l'image
-                    hist = recognizer.compute(image)  # Utilisez `compute` pour obtenir l'histogramme
+            if person_images:
+                # Entraîner le modèle LBPH sur les images de cette personne
+                recognizer.train(person_images, np.array(person_labels))
+
+                # Extraire les histogrammes après l'entraînement
+                for image in person_images:
+                    # Extraire l'histogramme après l'entraînement
+                    hist = recognizer.getHistograms()[0]  # Le premier histogramme pour la personne
                     person_histograms.append(hist)
 
-            if person_histograms:
                 # Calculer la moyenne des vecteurs caractéristiques pour cette personne
                 average_histogram = np.mean(person_histograms, axis=0)
+                b=np.array(average_histogram).flatten()
 
                 # Enregistrer le vecteur moyen dans le fichier .dat
-                dat_file.write(f"{person_name} {average_histogram.tolist()}\n")
+                dat_file.write(f"{person_name} {b.tolist()}\n")
                 print(f"Vecteur moyen enregistré pour {person_name} dans {output_dat_file}")
 
                 # Créer et enregistrer l'image moyenne pour la personne (optionnel)
