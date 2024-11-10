@@ -54,7 +54,7 @@ with open(output_dat_file, 'w') as dat_file:
 
                 # Créer et enregistrer l'image moyenne pour la personne (optionnel)
                 average_image = np.mean(person_images, axis=0).astype(np.uint8)
-                average_image_path = os.path.join(output_path, f"{cpt}.png")
+                average_image_path = os.path.join(output_path, f"{person_name}.png")
                 cv2.imwrite(average_image_path, average_image)
                 print(f"Image moyenne créée pour {person_name} et enregistrée sous {average_image_path}")
 

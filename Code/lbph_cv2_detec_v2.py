@@ -1,6 +1,12 @@
 import cv2
 import numpy as np
 import os
+import argparse
+
+
+parser = argparse.ArgumentParser(description='Tester une image avec le modèle LBPH et enregistrer le résultat.')
+parser.add_argument('input_image_path', type=str, help='Chemin de l\'image à tester')
+args = parser.parse_args()
 
 # Chemin vers le fichier de vecteurs moyens
 output_dat_file = 'output_vectors_moyens.dat'
@@ -20,7 +26,7 @@ def load_average_vectors(file_path):
             names.append(name)
             vectors.append(vector)
     
-    print(f"Vecteurs moyens chargés : {len(vectors)} vecteurs trouvés")
+    #print(f"Vecteurs moyens chargés : {len(vectors)} vecteurs trouvés")
     return names, vectors
 
 
@@ -39,7 +45,7 @@ def compute_lbph_vector(image_path):
     hist = recognizer.getHistograms()[0]  # Prendre l'histogramme
     hist_final = np.array(hist).flatten()
     
-    print(f"Taille du vecteur LBPH : {hist_final.shape}")
+    #print(f"Taille du vecteur LBPH : {hist_final.shape}")
     return hist_final
 
 
@@ -49,13 +55,16 @@ def find_closest_match(test_vector, vectors):
     min_index = -1
     for i, vector in enumerate(vectors):
         distance = np.linalg.norm(test_vector - vector)  # Calculer la distance euclidienne
+        # test_vector = np.array(test_vector, dtype=np.float32)
+        # vector = np.array(vector, dtype=np.float32) 
+        #distance = cv2.compareHist(test_vector, vector, cv2.HISTCMP_CHISQR)
         if distance < min_distance:
             min_distance = distance
             min_index = i
     return min_index, min_distance
 
 # Chemin de l'image à tester
-test_image_path = 'BDD/40_personnes_test/s1_last_9.pgm'
+test_image_path = args.input_image_path
 
 # Charger les vecteurs moyens
 names, average_vectors = load_average_vectors(output_dat_file)
@@ -67,4 +76,7 @@ test_vector = compute_lbph_vector(test_image_path)
 closest_index, closest_distance = find_closest_match(test_vector, average_vectors)
 
 # Afficher le résultat
-print(f"La correspondance la plus proche est : {names[closest_index]} avec une distance de {closest_distance}")
+if(closest_distance < 4.):
+    print(f"La correspondance la plus proche est : {names[closest_index]} avec une distance de {closest_distance}")
+else : 
+    print("Le visage testé n'appartient pas à la BDD")
