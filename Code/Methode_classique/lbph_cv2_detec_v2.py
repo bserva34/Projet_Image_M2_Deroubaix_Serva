@@ -26,7 +26,7 @@ def load_average_vectors(file_path):
             names.append(name)
             vectors.append(vector)
     
-    #print(f"Vecteurs moyens chargés : {len(vectors)} vecteurs trouvés")
+    print(f"Vecteurs moyens chargés : {len(vectors)} vecteurs trouvés")
     return names, vectors
 
 

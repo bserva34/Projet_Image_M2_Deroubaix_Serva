@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 # Chemin vers le dossier contenant les images de formation
-dataset_path = 'BDD/40_personnes_train'
+dataset_path = '../BDD/40_personnes_train'
 # Chemin vers le dossier où enregistrer les images moyennes
 output_path = 'output_images_moyennes'
 # Chemin vers le fichier de sortie pour les vecteurs caractéristiques moyens
@@ -43,13 +43,16 @@ with open(output_dat_file, 'w') as dat_file:
                     # Extraire l'histogramme après l'entraînement
                     hist = recognizer.getHistograms()[0]  # Le premier histogramme pour la personne
                     person_histograms.append(hist)
+                    acc = np.array(hist).flatten()
+                    dat_file.write(f"{person_name} {acc.tolist()}\n")
+
 
                 # Calculer la moyenne des vecteurs caractéristiques pour cette personne
-                average_histogram = np.mean(person_histograms, axis=0)
-                b=np.array(average_histogram).flatten()
+                #average_histogram = np.mean(person_histograms, axis=0)
+                #b=np.array(average_histogram).flatten()
 
                 # Enregistrer le vecteur moyen dans le fichier .dat
-                dat_file.write(f"{person_name} {b.tolist()}\n")
+                #dat_file.write(f"{person_name} {b.tolist()}\n")
                 print(f"Vecteur moyen enregistré pour {person_name} dans {output_dat_file}")
 
                 # Créer et enregistrer l'image moyenne pour la personne (optionnel)
