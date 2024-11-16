@@ -12,6 +12,7 @@ Les bibliothèques nécessaires peuvent être installées avec les commandes sui
 
 ```bash
 pip install deepface
+pip install cmake
 pip install dlib
 pip install opencv-python  
 

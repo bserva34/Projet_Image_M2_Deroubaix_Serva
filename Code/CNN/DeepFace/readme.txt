@@ -1,0 +1,1 @@
+Les images utilisés pour le YML ne sont pas disponible en public.
