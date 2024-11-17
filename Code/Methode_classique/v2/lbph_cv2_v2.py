@@ -3,11 +3,11 @@ import os
 import numpy as np
 
 # Chemin vers le dossier contenant les images de formation
-dataset_path = '../../BDD/40_personnes_train'
+dataset_path = '../../BDD/archive'
 # Chemin vers le dossier où enregistrer les images moyennes
 output_path = 'output_images_moyennes'
 # Chemin vers le fichier de sortie pour les vecteurs caractéristiques moyens
-output_dat_file = 'vectors_global.dat'
+output_dat_file = 'vectors.dat'
 
 # Créer le dossier de sortie s'il n'existe pas
 if not os.path.exists(output_path):
