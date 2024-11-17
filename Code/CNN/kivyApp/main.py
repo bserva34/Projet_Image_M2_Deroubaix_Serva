@@ -70,7 +70,7 @@ class CameraApp(App):
         try:
             # Détection des visages avec DeepFace
             self.faces_data = DeepFace.extract_faces(
-                img_path=img_bgr, detector_backend="dlib", enforce_detection=True, align=False
+                img_path=img_bgr, detector_backend="dlib", enforce_detection=True, align=True
             )
         except Exception as e:
             print(f"Erreur lors de la détection des visages : {e}")

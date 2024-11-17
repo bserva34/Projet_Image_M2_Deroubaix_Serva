@@ -80,7 +80,7 @@ for image_name in os.listdir(input_folder):
 
     # Utiliser DeepFace pour détecter les visages
     try:
-        faces = DeepFace.extract_faces(img_path, detector_backend='dlib', enforce_detection=True, align=False)
+        faces = DeepFace.extract_faces(img_path, detector_backend='dlib', enforce_detection=True, align=True)
     except Exception as e:
         print(f"Erreur de détection sur {image_name}: {e}")
         continue
