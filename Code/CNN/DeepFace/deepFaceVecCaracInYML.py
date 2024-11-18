@@ -2,7 +2,7 @@ import cv2
 import os
 import yaml
 from deepface import DeepFace
-from tkinter import Tk, simpledialog
+from tkinter import Tk, simpledialog, Button
 import shutil
 import numpy as np
 
@@ -70,6 +70,11 @@ def is_duplicate_embedding(embedding, existing_embeddings):
             return True
     return False
 
+# Fonction pour actualiser l'image dans OpenCV
+def refresh_image(image_to_show):
+    cv2.imshow("Image", image_to_show)
+    cv2.waitKey(1)  # Permet de rafraîchir l'image dans OpenCV
+
 # Parcourir chaque image dans le dossier d'entrée
 for image_name in os.listdir(input_folder):
     img_path = os.path.join(input_folder, image_name)
@@ -127,8 +132,8 @@ for image_name in os.listdir(input_folder):
         # Dessiner le rectangle vert autour du visage
         cv2.rectangle(canvas, (x1_resized, y1_resized), (x2_resized, y2_resized), (0, 255, 0), 2)
 
-        # Afficher l'image redimensionnée
-        cv2.imshow("Image", canvas)
+        # Actualiser l'image dans OpenCV
+        refresh_image(canvas)
 
         # Demander un label pour le visage via Tkinter
         label = get_label()
@@ -181,17 +186,17 @@ for image_name in os.listdir(input_folder):
             # Ajouter l'image et l'embedding dans le YAML
             new_entry = {
                 "image": new_name,  # Le nouveau nom du fichier dans "image_traitée"
-                "vector": embedding
+                "vector": embedding.tolist()
             }
             labeled_faces[label].append(new_entry)
 
-    # Supprimer les images traitées après la boucle
-    if os.path.exists(img_path):
-        os.remove(img_path)
-
-# Sauvegarder les données labellisées dans le fichier YAML
+            print(f"Image {image_name} avec label {label} enregistrée.")
+        else:
+            print(f"Vecteur dupliqué pour {image_name}, aucune action prise.")
+            
+# Sauvegarder les données dans le fichier YAML
 with open(output_yaml, 'w') as f:
     yaml.dump(labeled_faces, f, default_flow_style=False)
 
-# Fermer toutes les fenêtres d'affichage
+print("Toutes les données ont été traitées et sauvegardées.")
 cv2.destroyAllWindows()
