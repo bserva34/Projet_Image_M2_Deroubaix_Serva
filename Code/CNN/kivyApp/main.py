@@ -53,7 +53,6 @@ class CameraApp(App):
         self.camera.index = 1 if self.front_camera else 0
 
     def toggle_detection(self, instance):
-        print("")
         if not self.is_detecting:
             self.is_detecting = True
             instance.text = "Arrêter la détection"
@@ -63,18 +62,71 @@ class CameraApp(App):
             instance.text = "Commencer la détection"
             Clock.unschedule(self.detect_faces)
 
+    def compare_faces(self, input_embedding, labeled_faces, threshold=0.4):
+        closest_label = "Inconnu"
+        min_distance = float("inf")
+
+        for label, entries in labeled_faces.items():
+            for entry in entries:
+                embedding = np.array(entry["vector"])
+                distance = cosine(input_embedding, embedding)  # Calcul de la distance cosinus
+
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_label = label
+
+        # Définir le texte et la couleur selon le seuil
+        if min_distance < threshold:
+            label_text = closest_label
+            color = (0, 255, 0)  # Vert pour une correspondance valide
+        else:
+            label_text = "Inconnu"
+            color = (0, 0, 255)  # Rouge pour un visage non reconnu
+
+        return label_text, color
+        
+    #compara la moyenne des distances à label en sachant qu'il faut changer le seuil
+    # def compare_faces(self, input_embedding, labeled_faces, threshold=0.4):
+    #     closest_label = "Inconnu"
+    #     min_avg_distance = float("inf")  # Distance moyenne minimale initiale
+
+    #     for label, entries in labeled_faces.items():
+    #         distances = []  # Liste pour stocker les distances pour chaque label
+
+    #         for entry in entries:
+    #             embedding = np.array(entry["vector"])
+    #             distance = cosine(input_embedding, embedding)  # Calcul de la distance cosinus
+    #             distances.append(distance)
+
+    #         # Calculer la distance moyenne pour ce label
+    #         avg_distance = np.mean(distances)
+
+    #         # Si la distance moyenne est inférieure à la distance minimale précédente, mettre à jour
+    #         if avg_distance < min_avg_distance:
+    #             min_avg_distance = avg_distance
+    #             closest_label = label
+
+    #     # Définir le texte et la couleur selon la distance moyenne et le seuil
+    #     if min_avg_distance < threshold:
+    #         label_text = closest_label
+    #         color = (0, 255, 0)  # Vert pour une correspondance valide
+    #     else:
+    #         label_text = "Inconnu"
+    #         color = (0, 0, 255)  # Rouge pour un visage non reconnu
+
+    #     return label_text, color
+
+
     def detect_faces(self, dt):
         texture = self.camera.texture
         if not texture:
             return
+
         buffer = texture.pixels
         img = np.frombuffer(buffer, dtype=np.uint8).reshape(texture.height, texture.width, -1)
-
-        # Préparation de l'image pour la détection (sans inversion)
         img_bgr = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
 
         try:
-            # Détection des visages avec DeepFace
             self.faces_data = DeepFace.extract_faces(
                 img_path=img_bgr, detector_backend="dlib", enforce_detection=True, align=False
             )
@@ -82,7 +134,6 @@ class CameraApp(App):
             print(f"Erreur lors de la détection des visages : {e}")
             self.faces_data = []
 
-        # Dessiner les rectangles et le texte sur l'image originale (img_bgr)
         for face in self.faces_data:
             x, y, w, h = (
                 face["facial_area"]["x"],
@@ -91,40 +142,38 @@ class CameraApp(App):
                 face["facial_area"]["h"],
             )
 
-            # Dessiner un rectangle orange autour du visage
-            cv2.rectangle(img_bgr, (x, y), (x + w, y + h), (0, 165, 255), 2)
+            try:
+                embeddings = DeepFace.represent(
+                    img_path=img_bgr,
+                    model_name="Facenet",
+                    detector_backend="opencv",
+                    enforce_detection=False,
+                    align=False
+                )
+                input_embedding = embeddings[0]["embedding"]
 
-            # Ajouter un label "Reconnaissance en cours" en dessous du rectangle
-            label_text = "Reconnaissance en cours"
-            font_scale = 0.5
-            thickness = 1
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            text_size = cv2.getTextSize(label_text, font, font_scale, thickness)[0]
-            text_x = x
-            text_y = y + h + text_size[1] + 5  # Positionner sous le rectangle
+                # Utiliser la méthode compare_faces
+                label_text, color = self.compare_faces(input_embedding, labeled_faces)
+            except Exception as e:
+                print(f"Erreur lors de la comparaison des visages : {e}")
+                label_text, color = "Erreur", (0, 0, 255)
 
-            # Ajouter une bordure noire autour du texte
-            # Texte noir (bordure)
-            cv2.putText(img_bgr, label_text, (text_x-1, text_y-1), font, font_scale, (0, 0, 0), thickness+2)
-            cv2.putText(img_bgr, label_text, (text_x+1, text_y-1), font, font_scale, (0, 0, 0), thickness+2)
-            cv2.putText(img_bgr, label_text, (text_x-1, text_y+1), font, font_scale, (0, 0, 0), thickness+2)
-            cv2.putText(img_bgr, label_text, (text_x+1, text_y+1), font, font_scale, (0, 0, 0), thickness+2)
+            cv2.rectangle(img_bgr, (x, y), (x + w, y + h), color, 2)
+            cv2.putText(img_bgr, label_text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
-            # Texte principal (couleur de l'écriture)
-            cv2.putText(img_bgr, label_text, (text_x, text_y), font, font_scale, (0, 165, 255), thickness)
-
-        # Image pour l'affichage (inversée pour Kivy)
         img_flipped = cv2.flip(img_bgr, 0)
-
-        # Mettre à jour la texture avec les rectangles et labels sur l'image inversée
         img_rgba = cv2.cvtColor(img_flipped, cv2.COLOR_BGR2RGBA)
         texture = Texture.create(size=(img_rgba.shape[1], img_rgba.shape[0]), colorfmt="rgba")
         texture.blit_buffer(img_rgba.tobytes(), colorfmt="rgba", bufferfmt="ubyte")
-        self.camera.texture = texture
 
+        if hasattr(self, "annotated_image"):
+            self.annotated_image.texture = texture
+        else:
+            from kivy.uix.image import Image
+            self.annotated_image = Image(texture=texture, size_hint=(1, 0.88))
+            self.root.add_widget(self.annotated_image, index=0)
 
     def take_screenshot(self, instance):
-        # Récupérer une seule frame de la caméra
         texture = self.camera.texture
         if not texture:
             print("Aucune texture disponible.")
@@ -132,21 +181,15 @@ class CameraApp(App):
 
         buffer = texture.pixels
         img = np.frombuffer(buffer, dtype=np.uint8).reshape(texture.height, texture.width, -1)
-
-        # Convertir l'image en BGR pour OpenCV
         img_bgr = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
 
         try:
-            # Détection des visages avec DeepFace
             self.faces_data = DeepFace.extract_faces(
                 img_path=img_bgr, detector_backend="dlib", enforce_detection=True, align=False
             )
         except Exception as e:
             print(f"Erreur lors de la détection des visages : {e}")
             self.faces_data = []
-
-        # Seuil pour considérer une correspondance valide
-        threshold = 0.4  # Distance cosinus maximum pour une correspondance acceptable
 
         for face in self.faces_data:
             x, y, w, h = (
@@ -156,76 +199,31 @@ class CameraApp(App):
                 face["facial_area"]["h"],
             )
 
-            # Extraire l'encodage du visage avec DeepFace
             try:
                 embeddings = DeepFace.represent(
                     img_path=img_bgr,
                     model_name="Facenet",
-                    detector_backend="dlib",
+                    detector_backend="opencv",
                     enforce_detection=False,
                     align=False
                 )
                 input_embedding = embeddings[0]["embedding"]
+
+                label_text, color = self.compare_faces(input_embedding, labeled_faces)
             except Exception as e:
-                print(f"Erreur lors de l'extraction des caractéristiques : {e}")
-                continue
+                print(f"Erreur lors de la comparaison des visages : {e}")
+                label_text, color = "Erreur", (0, 0, 255)
 
-            # Trouver le label le plus proche
-            closest_label = None
-            min_distance = float("inf")
-
-            for label, entries in labeled_faces.items():
-                for entry in entries:
-                    embedding = np.array(entry["vector"])
-                    distance = cosine(input_embedding, embedding)  # Calcul de la distance cosinus
-
-                    if distance < min_distance:
-                        min_distance = distance
-                        closest_label = label
-
-            # Définir la couleur et le texte du cadre en fonction du seuil
-            if min_distance < threshold:
-                label_text = closest_label
-                color = (0, 255, 0)  # Orange pour les correspondances valides
-            else:
-                label_text = "Inconnu"
-                color = (0, 0, 255)  # Rouge pour les inconnus
-
-            # Dessiner un rectangle autour du visage
             cv2.rectangle(img_bgr, (x, y), (x + w, y + h), color, 2)
+            cv2.putText(img_bgr, label_text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
-            # Ajouter un label sous le rectangle
-            font_scale = 0.5
-            thickness = 1
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            text_size = cv2.getTextSize(label_text, font, font_scale, thickness)[0]
-            text_x = x
-            text_y = y + h + text_size[1] + 5
-
-            # Ajouter une bordure noire autour du texte
-            cv2.putText(img_bgr, label_text, (text_x - 1, text_y - 1), font, font_scale, (0, 0, 0), thickness + 2)
-            cv2.putText(img_bgr, label_text, (text_x + 1, text_y - 1), font, font_scale, (0, 0, 0), thickness + 2)
-            cv2.putText(img_bgr, label_text, (text_x - 1, text_y + 1), font, font_scale, (0, 0, 0), thickness + 2)
-            cv2.putText(img_bgr, label_text, (text_x + 1, text_y + 1), font, font_scale, (0, 0, 0), thickness + 2)
-
-            # Texte principal (couleur)
-            cv2.putText(img_bgr, label_text, (text_x, text_y), font, font_scale, color, thickness)
-
-        # Sauvegarder l'image annotée
         screenshot_path = "labeled_screenshot.png"
         cv2.imwrite(screenshot_path, img_bgr)
         print(f"Capture d'écran enregistrée sous '{screenshot_path}'")
 
-        # Mettre à jour l'affichage de la caméra avec l'image annotée
-        img_flipped = cv2.flip(img_bgr, 0)  # Inverser verticalement pour l'affichage Kivy
-        img_rgba = cv2.cvtColor(img_flipped, cv2.COLOR_BGR2RGBA)
-        texture = Texture.create(size=(img_rgba.shape[1], img_rgba.shape[0]), colorfmt="rgba")
-        texture.blit_buffer(img_rgba.tobytes(), colorfmt="rgba", bufferfmt="ubyte")
-        self.camera.texture = texture
-
-
 if __name__ == "__main__":
     CameraApp().run()
+
 
 
 
