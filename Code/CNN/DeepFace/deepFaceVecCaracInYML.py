@@ -85,7 +85,7 @@ for image_name in os.listdir(input_folder):
 
     # Utiliser DeepFace pour détecter les visages
     try:
-        faces = DeepFace.extract_faces(img_path, detector_backend='dlib', enforce_detection=True, align=True)
+        faces = DeepFace.extract_faces(img_path, detector_backend='dlib', enforce_detection=False, align=False)
     except Exception as e:
         print(f"Erreur de détection sur {image_name}: {e}")
         continue
@@ -103,10 +103,16 @@ for image_name in os.listdir(input_folder):
         margin_y = int(face_height * margin_percentage)
 
         # Ajouter la marge autour du visage
+        # y1_crop = max(0, y - margin_y)
+        # y2_crop = min(image.shape[0], y + face_height + margin_y)
+        # x1_crop = max(0, x - margin_x)
+        # x2_crop = min(image.shape[1], x + face_width + margin_x)
+
+        # Ajouter la marge autour du visage
         y1 = max(0, y - margin_y)
-        y2 = min(image.shape[0], y + face_height + margin_y)
+        y2 = min(image.shape[0], y + face_height )
         x1 = max(0, x - margin_x)
-        x2 = min(image.shape[1], x + face_width + margin_x)
+        x2 = min(image.shape[1], x + face_width )
 
         # Redimensionner l'image pour s'adapter à la fenêtre d'affichage tout en conservant le rapport d'aspect
         h, w = image.shape[:2]
@@ -155,7 +161,7 @@ for image_name in os.listdir(input_folder):
         # Obtenir le vecteur caractéristique pour le visage détecté
         try:
             cropped_face = image[y1:y2, x1:x2]
-            embedding = DeepFace.represent(cropped_face, model_name="Facenet", enforce_detection=False)[0]["embedding"]
+            embedding = DeepFace.represent(cropped_face,detector_backend='skip', model_name="Dlib", enforce_detection=True, align=True)[0]["embedding"]
         except Exception as e:
             print(f"Erreur lors de la génération de l'embedding pour {image_name}: {e}")
             continue
@@ -186,13 +192,16 @@ for image_name in os.listdir(input_folder):
             # Ajouter l'image et l'embedding dans le YAML
             new_entry = {
                 "image": new_name,  # Le nouveau nom du fichier dans "image_traitée"
-                "vector": embedding.tolist()
+                "vector": embedding
             }
             labeled_faces[label].append(new_entry)
 
             print(f"Image {image_name} avec label {label} enregistrée.")
         else:
             print(f"Vecteur dupliqué pour {image_name}, aucune action prise.")
+    # Supprimer les images traitées après la boucle
+    if os.path.exists(img_path):
+        os.remove(img_path)
             
 # Sauvegarder les données dans le fichier YAML
 with open(output_yaml, 'w') as f:
