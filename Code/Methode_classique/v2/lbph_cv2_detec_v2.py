@@ -40,11 +40,51 @@ def compute_lbph_vector(image_path):
     hist = recognizer.getHistograms()[0]
     return np.array(hist).flatten()
 
-# Fonction pour calculer la distance euclidienne et trouver la correspondance la plus proche
+# distance euclédienne
 def find_closest_match(test_vector, vectors):
     distances = np.linalg.norm(vectors - test_vector, axis=1)  # Distances euclidiennes
     min_index = np.argmin(distances)
     return min_index, distances[min_index]
+
+# Fonction pour calculer la distance cosinus
+def cosine_similarity(vector1, vector2):
+    dot_product = np.dot(vector1, vector2)
+    norm1 = np.linalg.norm(vector1)
+    norm2 = np.linalg.norm(vector2)
+    if norm1 == 0 or norm2 == 0:
+        return 0  # Retourner 0 si l'un des vecteurs est nul
+    return dot_product / (norm1 * norm2)
+
+# Fonction pour trouver la correspondance la plus proche en utilisant la similarité cosinus
+def find_closest_match_cosine(test_vector, vectors):
+    similarities = [cosine_similarity(test_vector, vector) for vector in vectors]
+    max_index = np.argmax(similarities)  # On cherche la similarité maximale
+    return max_index, similarities[max_index]
+
+# Fonction pour normaliser une distance euclidienne en un score (inverse)
+def normalize_euclidean_distance(distance):
+    return 1 / (1 + distance)
+
+# Fonction pour calculer le score global en combinant les deux méthodes
+def find_combined_match(test_vector, vectors, weight_euclidean=0.5, weight_cosine=0.5):
+    scores = []
+    for vector in vectors:
+        # Distance euclidienne inversée
+        euclidean_distance = np.linalg.norm(test_vector - vector)
+        euclidean_score = normalize_euclidean_distance(euclidean_distance)
+
+        # Similarité cosinus
+        cosine_score = cosine_similarity(test_vector, vector)
+
+        # Combinaison pondérée
+        combined_score = (weight_euclidean * euclidean_score) + (weight_cosine * cosine_score)
+        scores.append(combined_score)
+
+    # Trouver l'indice avec le score combiné maximum
+    max_index = np.argmax(scores)
+    return max_index, scores[max_index]
+
+
 
 # Charger les vecteurs moyens
 names, average_vectors = load_average_vectors(output_dat_file)
@@ -54,11 +94,15 @@ test_image_path = args.input_image_path
 test_vector = compute_lbph_vector(test_image_path)
 
 # Trouver l'indice et la distance de la correspondance la plus proche
-closest_index, closest_distance = find_closest_match(test_vector, average_vectors)
+#closest_index, closest_distance = find_closest_match_cosine(test_vector, average_vectors)
 
-# Afficher le résultat
-threshold = 4.0  # Seuil à ajuster en fonction des performances souhaitées
-if closest_distance < threshold:
-    print(f"{names[closest_index]} : {closest_distance:.2f}")
-else:
-    print("Le visage testé n'appartient pas à la BDD.")
+# # Afficher le résultat
+# threshold = 4.0  # Seuil à ajuster en fonction des performances souhaitées
+# if closest_distance < threshold:
+#     print(f"{names[closest_index]} : {closest_distance:.2f}")
+# else:
+#     print("Le visage testé n'appartient pas à la BDD.")
+
+closest_index, combined_score = find_combined_match(test_vector, average_vectors, weight_euclidean=0.4, weight_cosine=0.6)
+
+print(f"{names[closest_index]} : {combined_score:.2f}")

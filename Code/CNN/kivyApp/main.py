@@ -123,13 +123,13 @@ class CameraApp(App):
         self.camera.texture = texture
 
 
-
     def take_screenshot(self, instance):
         # Récupérer une seule frame de la caméra
         texture = self.camera.texture
         if not texture:
             print("Aucune texture disponible.")
             return
+
         buffer = texture.pixels
         img = np.frombuffer(buffer, dtype=np.uint8).reshape(texture.height, texture.width, -1)
 
@@ -145,6 +145,9 @@ class CameraApp(App):
             print(f"Erreur lors de la détection des visages : {e}")
             self.faces_data = []
 
+        # Seuil pour considérer une correspondance valide
+        threshold = 0.4  # Distance cosinus maximum pour une correspondance acceptable
+
         for face in self.faces_data:
             x, y, w, h = (
                 face["facial_area"]["x"],
@@ -156,11 +159,11 @@ class CameraApp(App):
             # Extraire l'encodage du visage avec DeepFace
             try:
                 embeddings = DeepFace.represent(
-                    img_path=img_bgr,  # Utiliser l'image déjà alignée
+                    img_path=img_bgr,
                     model_name="Facenet",
-                    detector_backend="dlib",  # L'alignement est déjà fait
+                    detector_backend="dlib",
                     enforce_detection=False,
-                    align = False
+                    align=False
                 )
                 input_embedding = embeddings[0]["embedding"]
             except Exception as e:
@@ -180,11 +183,18 @@ class CameraApp(App):
                         min_distance = distance
                         closest_label = label
 
-            # Dessiner un rectangle orange autour du visage
-            cv2.rectangle(img_bgr, (x, y), (x + w, y + h), (0, 165, 255), 2)
+            # Définir la couleur et le texte du cadre en fonction du seuil
+            if min_distance < threshold:
+                label_text = closest_label
+                color = (0, 255, 0)  # Orange pour les correspondances valides
+            else:
+                label_text = "Inconnu"
+                color = (0, 0, 255)  # Rouge pour les inconnus
+
+            # Dessiner un rectangle autour du visage
+            cv2.rectangle(img_bgr, (x, y), (x + w, y + h), color, 2)
 
             # Ajouter un label sous le rectangle
-            label_text = closest_label if closest_label else "Inconnu"
             font_scale = 0.5
             thickness = 1
             font = cv2.FONT_HERSHEY_SIMPLEX
@@ -193,13 +203,13 @@ class CameraApp(App):
             text_y = y + h + text_size[1] + 5
 
             # Ajouter une bordure noire autour du texte
-            cv2.putText(img_bgr, label_text, (text_x-1, text_y-1), font, font_scale, (0, 0, 0), thickness+2)
-            cv2.putText(img_bgr, label_text, (text_x+1, text_y-1), font, font_scale, (0, 0, 0), thickness+2)
-            cv2.putText(img_bgr, label_text, (text_x-1, text_y+1), font, font_scale, (0, 0, 0), thickness+2)
-            cv2.putText(img_bgr, label_text, (text_x+1, text_y+1), font, font_scale, (0, 0, 0), thickness+2)
+            cv2.putText(img_bgr, label_text, (text_x - 1, text_y - 1), font, font_scale, (0, 0, 0), thickness + 2)
+            cv2.putText(img_bgr, label_text, (text_x + 1, text_y - 1), font, font_scale, (0, 0, 0), thickness + 2)
+            cv2.putText(img_bgr, label_text, (text_x - 1, text_y + 1), font, font_scale, (0, 0, 0), thickness + 2)
+            cv2.putText(img_bgr, label_text, (text_x + 1, text_y + 1), font, font_scale, (0, 0, 0), thickness + 2)
 
             # Texte principal (couleur)
-            cv2.putText(img_bgr, label_text, (text_x, text_y), font, font_scale, (0, 165, 255), thickness)
+            cv2.putText(img_bgr, label_text, (text_x, text_y), font, font_scale, color, thickness)
 
         # Sauvegarder l'image annotée
         screenshot_path = "labeled_screenshot.png"
@@ -212,6 +222,7 @@ class CameraApp(App):
         texture = Texture.create(size=(img_rgba.shape[1], img_rgba.shape[0]), colorfmt="rgba")
         texture.blit_buffer(img_rgba.tobytes(), colorfmt="rgba", bufferfmt="ubyte")
         self.camera.texture = texture
+
 
 if __name__ == "__main__":
     CameraApp().run()
