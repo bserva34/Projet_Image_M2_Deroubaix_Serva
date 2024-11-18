@@ -8,8 +8,13 @@ import cv2
 import numpy as np
 from deepface import DeepFace
 from kivy.config import Config
+from scipy.spatial.distance import cosine
+import yaml 
 Config.set('graphics', 'width', '450')
 Config.set('graphics', 'height', '800')
+
+with open("../DeepFace/labeled_faces.yml", "r") as file:
+    labeled_faces = yaml.safe_load(file)
 
 class CameraApp(App):
     def build(self):
@@ -48,6 +53,7 @@ class CameraApp(App):
         self.camera.index = 1 if self.front_camera else 0
 
     def toggle_detection(self, instance):
+        print("")
         if not self.is_detecting:
             self.is_detecting = True
             instance.text = "Arrêter la détection"
@@ -70,7 +76,7 @@ class CameraApp(App):
         try:
             # Détection des visages avec DeepFace
             self.faces_data = DeepFace.extract_faces(
-                img_path=img_bgr, detector_backend="dlib", enforce_detection=True, align=True
+                img_path=img_bgr, detector_backend="dlib", enforce_detection=True, align=False
             )
         except Exception as e:
             print(f"Erreur lors de la détection des visages : {e}")
@@ -117,23 +123,98 @@ class CameraApp(App):
         self.camera.texture = texture
 
 
+
     def take_screenshot(self, instance):
-        if not self.faces_data:
-            print("Aucun visage détecté pour la capture d'écran.")
-            return
-
-        # Capture d'écran basée sur l'image originale (non inversée)
+        # Récupérer une seule frame de la caméra
         texture = self.camera.texture
-        if texture:
-            buffer = texture.pixels
-            img = np.frombuffer(buffer, dtype=np.uint8).reshape(texture.height, texture.width, -1)
-            img_bgr = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
-            img_flipped = cv2.flip(img_bgr, 0)
+        if not texture:
+            print("Aucune texture disponible.")
+            return
+        buffer = texture.pixels
+        img = np.frombuffer(buffer, dtype=np.uint8).reshape(texture.height, texture.width, -1)
 
-            # Enregistrer l'image
-            cv2.imwrite("screenshot.png", img_flipped)
-            print("Capture d'écran enregistrée sous 'screenshot.png'")
+        # Convertir l'image en BGR pour OpenCV
+        img_bgr = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
 
+        try:
+            # Détection des visages avec DeepFace
+            self.faces_data = DeepFace.extract_faces(
+                img_path=img_bgr, detector_backend="dlib", enforce_detection=True, align=False
+            )
+        except Exception as e:
+            print(f"Erreur lors de la détection des visages : {e}")
+            self.faces_data = []
+
+        for face in self.faces_data:
+            x, y, w, h = (
+                face["facial_area"]["x"],
+                face["facial_area"]["y"],
+                face["facial_area"]["w"],
+                face["facial_area"]["h"],
+            )
+
+            # Extraire l'encodage du visage avec DeepFace
+            try:
+                embeddings = DeepFace.represent(
+                    img_path=img_bgr,  # Utiliser l'image déjà alignée
+                    model_name="Facenet",
+                    detector_backend="dlib",  # L'alignement est déjà fait
+                    enforce_detection=False,
+                    align = False
+                )
+                input_embedding = embeddings[0]["embedding"]
+            except Exception as e:
+                print(f"Erreur lors de l'extraction des caractéristiques : {e}")
+                continue
+
+            # Trouver le label le plus proche
+            closest_label = None
+            min_distance = float("inf")
+
+            for label, entries in labeled_faces.items():
+                for entry in entries:
+                    embedding = np.array(entry["vector"])
+                    distance = cosine(input_embedding, embedding)  # Calcul de la distance cosinus
+
+                    if distance < min_distance:
+                        min_distance = distance
+                        closest_label = label
+
+            # Dessiner un rectangle orange autour du visage
+            cv2.rectangle(img_bgr, (x, y), (x + w, y + h), (0, 165, 255), 2)
+
+            # Ajouter un label sous le rectangle
+            label_text = closest_label if closest_label else "Inconnu"
+            font_scale = 0.5
+            thickness = 1
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            text_size = cv2.getTextSize(label_text, font, font_scale, thickness)[0]
+            text_x = x
+            text_y = y + h + text_size[1] + 5
+
+            # Ajouter une bordure noire autour du texte
+            cv2.putText(img_bgr, label_text, (text_x-1, text_y-1), font, font_scale, (0, 0, 0), thickness+2)
+            cv2.putText(img_bgr, label_text, (text_x+1, text_y-1), font, font_scale, (0, 0, 0), thickness+2)
+            cv2.putText(img_bgr, label_text, (text_x-1, text_y+1), font, font_scale, (0, 0, 0), thickness+2)
+            cv2.putText(img_bgr, label_text, (text_x+1, text_y+1), font, font_scale, (0, 0, 0), thickness+2)
+
+            # Texte principal (couleur)
+            cv2.putText(img_bgr, label_text, (text_x, text_y), font, font_scale, (0, 165, 255), thickness)
+
+        # Sauvegarder l'image annotée
+        screenshot_path = "labeled_screenshot.png"
+        cv2.imwrite(screenshot_path, img_bgr)
+        print(f"Capture d'écran enregistrée sous '{screenshot_path}'")
+
+        # Mettre à jour l'affichage de la caméra avec l'image annotée
+        img_flipped = cv2.flip(img_bgr, 0)  # Inverser verticalement pour l'affichage Kivy
+        img_rgba = cv2.cvtColor(img_flipped, cv2.COLOR_BGR2RGBA)
+        texture = Texture.create(size=(img_rgba.shape[1], img_rgba.shape[0]), colorfmt="rgba")
+        texture.blit_buffer(img_rgba.tobytes(), colorfmt="rgba", bufferfmt="ubyte")
+        self.camera.texture = texture
 
 if __name__ == "__main__":
     CameraApp().run()
+
+
+
