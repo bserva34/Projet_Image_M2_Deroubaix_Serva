@@ -20,7 +20,7 @@ if not labeled_faces:
 try:
     embeddings = DeepFace.represent(
         img_path=input_image_path,
-        model_name="Facenet",
+        model_name="Dlib",
         detector_backend="dlib",
         enforce_detection=True,
         align=True
