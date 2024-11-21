@@ -177,7 +177,7 @@ class CameraApp(App):
             # Ajouter le label si demandé
             if show_labels and distance is not None:
                 label_text = f"{label} ({distance:.2f})"
-                cv2.putText(frame, label_text, (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+                cv2.putText(frame, label_text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
 
     @mainthread
     def display_frame(self, frame, image_widget):
