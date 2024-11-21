@@ -11,7 +11,7 @@ import numpy as np
 import yaml
 from deepface import DeepFace
 from scipy.spatial.distance import cosine
-
+import copy
 
 class CameraApp(App):
     def build(self):
@@ -45,19 +45,19 @@ class CameraApp(App):
 
         # Charger la caméra
         self.capture = cv2.VideoCapture(0)
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 300)
+        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 300)
 
         # Initialisation des visages et des données
         self.faces_data_reel_time = []
         self.faces_data_reco_facial = []
         self.last_embedding_time = 0
-        self.last_face_detection_time = 0
-        self.detection_interval = 12  # Nombre de frames entre deux détections
-        self.embedding_interval = 1  # Délai (en secondes) entre deux générations d'embeddings
+        self.last_extract_time = 0
+        self.detection_interval = 0.03 # Délai (en secondes) entre deux générations d'embeddings
+        self.embedding_interval = 1.0  # Délai (en secondes) entre deux générations d'embeddings
 
-        Clock.schedule_interval(self.update_reel_time_image, 1.0 / 24)  # 24 FPS
-        Clock.schedule_interval(self.update_reco_facial_image, 1.0 / 24)  # 24 FPS pour affichage secondaire
+        Clock.schedule_interval(self.update_reel_time_image, 1.0 / 30)  # 30 FPS
+        Clock.schedule_interval(self.update_reco_facial_image, 1.0 / 30)  # 30 FPS pour affichage secondaire
 
         # Charger les vecteurs caractéristiques
         self.labeled_faces = self.load_yaml("../DeepFace/labeled_faces.yml")
@@ -86,10 +86,12 @@ class CameraApp(App):
         if ret:
             if self.cnn_active:
                 current_frame_count = int(self.capture.get(cv2.CAP_PROP_POS_FRAMES))
-
+                current_time = time.time()
                 # Appeler extract_faces toutes les 10 frames
-                if current_frame_count % self.detection_interval == 0:
+                #if current_frame_count % self.detection_interval == 0:
+                if current_time - self.last_extract_time > self.embedding_interval:
                     self.faces_data_reel_time = self.detect_faces(frame)
+                    self.last_extract_time = current_time
 
                 # Dessiner les rectangles avec les données existantes
                 self.draw_faces(frame, self.faces_data_reel_time)
@@ -102,11 +104,14 @@ class CameraApp(App):
         ret, frame = self.capture.read()
         if ret:
             if self.cnn_active:
+                #current_frame_count = int(self.capture.get(cv2.CAP_PROP_POS_FRAMES))
                 current_time = time.time()
 
                 # Générer les embeddings toutes les secondes
+                #if current_frame_count % self.embedding_interval == 0:
                 if current_time - self.last_embedding_time > self.embedding_interval:
-                    self.faces_data_reco_facial=self.faces_data_reel_time
+                    self.faces_data_reco_facial = copy.deepcopy(self.faces_data_reel_time)
+                    #self.faces_data_reco_facial=self.faces_data_reel_time
                     self.update_embeddings(self.faces_data_reco_facial, frame)
                     self.last_embedding_time = current_time
 
@@ -177,7 +182,7 @@ class CameraApp(App):
             # Ajouter le label si demandé
             if show_labels and distance is not None:
                 label_text = f"{label} ({distance:.2f})"
-                cv2.putText(frame, label_text, (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+                cv2.putText(frame, label_text, (x, y + h + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
 
     @mainthread
     def display_frame(self, frame, image_widget):
@@ -201,7 +206,7 @@ class CameraApp(App):
             cv2.imwrite(filename, frame_bgr)
             print(f"Screenshot saved: {filename}")
 
-    def compare_faces(self, input_embedding, labeled_faces, threshold=0.1):
+    def compare_faces(self, input_embedding, labeled_faces, threshold=0.075):
         closest_label = "Inconnu"
         min_distance = float("inf")
 
@@ -213,8 +218,11 @@ class CameraApp(App):
                 if distance < min_distance:
                     min_distance = distance
                     closest_label = label
-
-        color = (0, 255, 0) if min_distance < threshold else (0, 0, 255)
+        if min_distance < threshold:
+            color = (0, 255, 0) 
+        else:
+            color = (0, 0, 255)
+            closest_label = "Inconnu"
         return closest_label, color, min_distance
 
     def on_stop(self):
