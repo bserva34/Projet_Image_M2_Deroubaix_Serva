@@ -45,8 +45,8 @@ class CameraApp(App):
 
         # Charger la caméra
         self.capture = cv2.VideoCapture(0)
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 300)
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 300)
+        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 
         # Initialisation des visages et des données
         self.faces_data_reel_time = []
@@ -182,7 +182,7 @@ class CameraApp(App):
             # Ajouter le label si demandé
             if show_labels and distance is not None:
                 label_text = f"{label} ({distance:.2f})"
-                cv2.putText(frame, label_text, (x, y + h + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+                cv2.putText(frame, label_text, (x, y + h + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
     @mainthread
     def display_frame(self, frame, image_widget):
