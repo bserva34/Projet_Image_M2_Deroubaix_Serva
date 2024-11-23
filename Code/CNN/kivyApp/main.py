@@ -21,11 +21,12 @@ class CameraApp(App):
         # Boutons à gauche
         button_layout = BoxLayout(orientation="vertical", size_hint=(0.2, 1))
         self.cnn_btn = Button(text="CNN (Off)")
-        self.lbph_btn = Button(text="LBPH")
+        self.lbph_btn = Button(text="LBPH (Off)")
         self.screenshot_btn = Button(text="Screenshot")
 
         # Associer les boutons à des fonctions
         self.cnn_active = False
+        self.lbph_active = False
         self.cnn_btn.bind(on_press=self.toggle_cnn)
         self.lbph_btn.bind(on_press=self.toggle_lbph)
         self.screenshot_btn.bind(on_press=self.take_screenshots)
@@ -62,6 +63,8 @@ class CameraApp(App):
         # Charger les vecteurs caractéristiques
         self.labeled_faces = self.load_yaml("../DeepFace/labeled_faces.yml")
 
+        self.name_lbph, self.vector_lbph = self.load__vectors_lbph("lbph_bdd.dat")
+
         return main_layout
 
     def load_yaml(self, file_path):
@@ -73,11 +76,44 @@ class CameraApp(App):
             print(f"Erreur lors du chargement du fichier YAML : {e}")
             return {}
 
+    def load__vectors_lbph(self, file_path):
+        vectors = []
+        names = []
+        with open(file_path, "r") as f:
+            for line in f:
+                parts = line.strip().split(" ")
+                name = parts[0]
+                vector = np.array([float(x) for x in parts[1:]])
+                names.append(name)
+                vectors.append(vector)
+
+        return names, np.array(vectors)
+
+    def compute_lbph_vector(self, gray_image):
+        recognizer = cv2.face.LBPHFaceRecognizer_create()
+        recognizer.train([gray_image], np.array([0]))
+        hist = recognizer.getHistograms()[0]
+        return np.array(hist).flatten()
+
+
+    def find_closest_match(self, test_vector, vectors):
+        distances = np.linalg.norm(vectors - test_vector, axis=1)  # Distances euclidiennes
+        min_index = np.argmin(distances)
+        return min_index, distances[min_index]
+
     def toggle_lbph(self, instance):
-        print(f"{instance.text} button pressed (function not implemented).")
+        self.lbph_active = not self.lbph_active
+        if self.lbph_active:
+            self.cnn_active = False
+            self.cnn_btn.text = "CNN (Off)"
+        self.lbph_btn.text = "LBPH (On)" if self.lbph_active else "LBPH (Off)"
+        print(f"LBPH mode {'enabled' if self.lbph_active else 'disabled'}.")
 
     def toggle_cnn(self, instance):
         self.cnn_active = not self.cnn_active
+        if self.cnn_active:
+            self.lbph_active = False
+            self.lbph_btn.text = "LBPH (Off)"
         self.cnn_btn.text = "CNN (On)" if self.cnn_active else "CNN (Off)"
         print(f"CNN mode {'enabled' if self.cnn_active else 'disabled'}.")
 
@@ -100,10 +136,11 @@ class CameraApp(App):
             else:
                 self.display_frame(frame, self.reel_time_image)
 
+
     def update_reco_facial_image(self, dt):
         ret, frame = self.capture.read()
         if ret:
-            if self.cnn_active:
+            if self.cnn_active or self.lbph_active:
                 #current_frame_count = int(self.capture.get(cv2.CAP_PROP_POS_FRAMES))
                 current_time = time.time()
 
