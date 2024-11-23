@@ -210,22 +210,14 @@ class CameraApp(App):
             x, y, w, h = face["rect"]
             cropped_face = frame[y:y + h, x:x + w]
             cropped_face = cv2.cvtColor(cropped_face, cv2.COLOR_BGR2GRAY)
-
-            # Calculer l'histogramme du visage crop
             test_vector = self.compute_lbph_vector(cropped_face)
-
-            # Trouver la correspondance la plus proche
             min_index, min_distance = self.find_closest_match(test_vector, self.vector_lbph)
-
-            # Récupérer le label correspondant à l'index (nom)
             label = self.name_lbph[min_index]
-            
-            # Mettre à jour les informations du dictionnaire face
             face.update({
-                "embedding": test_vector,        # L'histogramme aplati
-                "label": label,                  # Nom associé à l'index
-                "distance": min_distance,        # Distance minimale (similarité)
-                "color": (0, 255, 0),            # Couleur verte
+                "embedding": test_vector,        
+                "label": label,                  
+                "distance": min_distance,        
+                "color": (0, 255, 0),            
             })
 
     def update_embeddings(self, faces_data, frame):
