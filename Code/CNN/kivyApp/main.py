@@ -283,6 +283,7 @@ class CameraApp(App):
             buffer = texture.pixels
             frame = np.frombuffer(buffer, np.uint8).reshape(height, width, 4)
             frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
+            frame_bgr = cv2.flip(frame_bgr, 0)  # 0 pour retourner verticalement
             cv2.imwrite(filename, frame_bgr)
             print(f"Screenshot saved: {filename}")
 
