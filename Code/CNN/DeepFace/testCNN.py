@@ -47,6 +47,7 @@ with open(output_file, "w") as output:
         closest_label = None
         closest_image = None
         min_distance = float("inf")
+        closest_label_count = 0  # Nombre d'images pour le label trouvé
 
         # Parcourir les labels et leurs vecteurs dans le fichier YAML
         for label, entries in labeled_faces.items():
@@ -58,11 +59,12 @@ with open(output_file, "w") as output:
                     min_distance = distance
                     closest_label = label
                     closest_image = entry["image"]
+                    closest_label_count = len(entries)  # Mettre à jour le nombre d'images pour ce label
 
         # Enregistrer le résultat dans le fichier de sortie
         if closest_label is not None and closest_image is not None:
-            output.write(f"{image_file} {closest_label} {min_distance:.4f}\n")
-            print(f"Résultat ajouté pour {image_file}: Label={closest_label}, Distance={min_distance:.4f}")
+            output.write(f"{image_file} {closest_label} {min_distance:.4f} {closest_image} {closest_label_count}\n")
+            print(f"Résultat ajouté pour {image_file}: Label={closest_label}, Image correspondante={closest_image}, Distance={min_distance:.4f}, Nombre d'images={closest_label_count}")
         else:
             output.write(f"{image_file} Aucune_correspondance -1\n")
             print(f"Aucune correspondance trouvée pour {image_file}")
