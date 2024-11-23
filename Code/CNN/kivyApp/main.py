@@ -1,4 +1,3 @@
-import threading
 import time
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
@@ -52,10 +51,13 @@ class CameraApp(App):
         # Initialisation des visages et des données
         self.faces_data_reel_time = []
         self.faces_data_reco_facial = []
+        self.faces_data_lbph = []
         self.last_embedding_time = 0
         self.last_extract_time = 0
-        self.detection_interval = 0.03 # Délai (en secondes) entre deux générations d'embeddings
+        self.last_lbph_time =0
+        self.detection_interval = 0.15 # Délai (en secondes) entre deux générations d'embeddings
         self.embedding_interval = 1.0  # Délai (en secondes) entre deux générations d'embeddings
+        self.lbph_interval = 0.15
 
         Clock.schedule_interval(self.update_reel_time_image, 1.0 / 30)  # 30 FPS
         Clock.schedule_interval(self.update_reco_facial_image, 1.0 / 30)  # 30 FPS pour affichage secondaire
@@ -120,27 +122,31 @@ class CameraApp(App):
     def update_reel_time_image(self, dt):
         ret, frame = self.capture.read()
         if ret:
-            if self.cnn_active:
-                current_frame_count = int(self.capture.get(cv2.CAP_PROP_POS_FRAMES))
+            if self.cnn_active or self.lbph_active:
+                #current_frame_count = int(self.capture.get(cv2.CAP_PROP_POS_FRAMES))
                 current_time = time.time()
                 # Appeler extract_faces toutes les 10 frames
                 #if current_frame_count % self.detection_interval == 0:
-                if current_time - self.last_extract_time > self.embedding_interval:
+                if current_time - self.last_extract_time > self.detection_interval:
                     self.faces_data_reel_time = self.detect_faces(frame)
                     self.last_extract_time = current_time
 
                 # Dessiner les rectangles avec les données existantes
                 self.draw_faces(frame, self.faces_data_reel_time)
 
+                frame = cv2.flip(frame, 0)  # 0 pour retourner verticalement
                 self.display_frame(frame, self.reel_time_image)
+
             else:
+                frame = cv2.flip(frame, 0)  # 0 pour retourner verticalement
                 self.display_frame(frame, self.reel_time_image)
+
 
 
     def update_reco_facial_image(self, dt):
         ret, frame = self.capture.read()
         if ret:
-            if self.cnn_active or self.lbph_active:
+            if self.cnn_active :
                 #current_frame_count = int(self.capture.get(cv2.CAP_PROP_POS_FRAMES))
                 current_time = time.time()
 
@@ -154,8 +160,23 @@ class CameraApp(App):
 
                 # Dessiner les rectangles avec les labels et distances
                 self.draw_faces(frame, self.faces_data_reco_facial, show_labels=True)
+                frame = cv2.flip(frame, 0)  # 0 pour retourner verticalement
                 self.display_frame(frame, self.reco_facial_image)
+            elif self.lbph_active:
+                current_time = time.time()
+
+                if current_time - self.last_lbph_time > self.lbph_interval:
+                    self.faces_data_lbph = copy.deepcopy(self.faces_data_reel_time)
+                    self.update_lbph(self.faces_data_lbph, frame)
+                    self.last_lbph_time = current_time
+
+                # Dessiner les rectangles avec les labels et distances
+                self.draw_faces(frame, self.faces_data_lbph, show_labels=True)
+                frame = cv2.flip(frame, 0)  # 0 pour retourner verticalement
+                self.display_frame(frame, self.reco_facial_image)
+
             else:
+                frame = cv2.flip(frame, 0)  # 0 pour retourner verticalement
                 self.display_frame(frame, self.reco_facial_image)
 
     def detect_faces(self, frame):
@@ -183,6 +204,29 @@ class CameraApp(App):
         except Exception as e:
             print(f"Erreur lors de l'extraction des visages : {e}")
             return []
+
+    def update_lbph(self, faces_data, frame):
+        for face in faces_data:
+            x, y, w, h = face["rect"]
+            cropped_face = frame[y:y + h, x:x + w]
+            cropped_face = cv2.cvtColor(cropped_face, cv2.COLOR_BGR2GRAY)
+
+            # Calculer l'histogramme du visage crop
+            test_vector = self.compute_lbph_vector(cropped_face)
+
+            # Trouver la correspondance la plus proche
+            min_index, min_distance = self.find_closest_match(test_vector, self.vector_lbph)
+
+            # Récupérer le label correspondant à l'index (nom)
+            label = self.name_lbph[min_index]
+            
+            # Mettre à jour les informations du dictionnaire face
+            face.update({
+                "embedding": test_vector,        # L'histogramme aplati
+                "label": label,                  # Nom associé à l'index
+                "distance": min_distance,        # Distance minimale (similarité)
+                "color": (0, 255, 0),            # Couleur verte
+            })
 
     def update_embeddings(self, faces_data, frame):
         for face in faces_data:
@@ -221,7 +265,6 @@ class CameraApp(App):
                 label_text = f"{label} ({distance:.2f})"
                 cv2.putText(frame, label_text, (x, y + h + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
-    @mainthread
     def display_frame(self, frame, image_widget):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
         buffer = frame_rgb.tobytes()
