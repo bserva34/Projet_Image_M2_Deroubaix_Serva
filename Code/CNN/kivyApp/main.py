@@ -73,8 +73,8 @@ class CameraApp(App):
 
         # Charger la caméra
         self.capture = cv2.VideoCapture(0)
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 620)
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 400)
+        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
 
         # Initialisation des visages et des données
         self.faces_data_reel_time = []
