@@ -2,7 +2,7 @@ import cv2
 import os
 import yaml
 from deepface import DeepFace
-from tkinter import Tk, simpledialog
+from tkinter import Tk, simpledialog, Button
 import shutil
 import numpy as np
 
@@ -70,6 +70,11 @@ def is_duplicate_embedding(embedding, existing_embeddings):
             return True
     return False
 
+# Fonction pour actualiser l'image dans OpenCV
+def refresh_image(image_to_show):
+    cv2.imshow("Image", image_to_show)
+    cv2.waitKey(1)  # Permet de rafraîchir l'image dans OpenCV
+
 # Parcourir chaque image dans le dossier d'entrée
 for image_name in os.listdir(input_folder):
     img_path = os.path.join(input_folder, image_name)
@@ -80,7 +85,7 @@ for image_name in os.listdir(input_folder):
 
     # Utiliser DeepFace pour détecter les visages
     try:
-        faces = DeepFace.extract_faces(img_path, detector_backend='dlib', enforce_detection=True, align=True)
+        faces = DeepFace.extract_faces(img_path, detector_backend='dlib', enforce_detection=False, align=False)
     except Exception as e:
         print(f"Erreur de détection sur {image_name}: {e}")
         continue
@@ -98,10 +103,16 @@ for image_name in os.listdir(input_folder):
         margin_y = int(face_height * margin_percentage)
 
         # Ajouter la marge autour du visage
+        # y1_crop = max(0, y - margin_y)
+        # y2_crop = min(image.shape[0], y + face_height + margin_y)
+        # x1_crop = max(0, x - margin_x)
+        # x2_crop = min(image.shape[1], x + face_width + margin_x)
+
+        # Ajouter la marge autour du visage
         y1 = max(0, y - margin_y)
-        y2 = min(image.shape[0], y + face_height + margin_y)
+        y2 = min(image.shape[0], y + face_height )
         x1 = max(0, x - margin_x)
-        x2 = min(image.shape[1], x + face_width + margin_x)
+        x2 = min(image.shape[1], x + face_width )
 
         # Redimensionner l'image pour s'adapter à la fenêtre d'affichage tout en conservant le rapport d'aspect
         h, w = image.shape[:2]
@@ -127,8 +138,8 @@ for image_name in os.listdir(input_folder):
         # Dessiner le rectangle vert autour du visage
         cv2.rectangle(canvas, (x1_resized, y1_resized), (x2_resized, y2_resized), (0, 255, 0), 2)
 
-        # Afficher l'image redimensionnée
-        cv2.imshow("Image", canvas)
+        # Actualiser l'image dans OpenCV
+        refresh_image(canvas)
 
         # Demander un label pour le visage via Tkinter
         label = get_label()
@@ -150,7 +161,7 @@ for image_name in os.listdir(input_folder):
         # Obtenir le vecteur caractéristique pour le visage détecté
         try:
             cropped_face = image[y1:y2, x1:x2]
-            embedding = DeepFace.represent(cropped_face, model_name="Facenet", enforce_detection=False)[0]["embedding"]
+            embedding = DeepFace.represent(cropped_face,detector_backend='skip', model_name="Dlib", enforce_detection=True, align=True)[0]["embedding"]
         except Exception as e:
             print(f"Erreur lors de la génération de l'embedding pour {image_name}: {e}")
             continue
@@ -185,13 +196,16 @@ for image_name in os.listdir(input_folder):
             }
             labeled_faces[label].append(new_entry)
 
+            print(f"Image {image_name} avec label {label} enregistrée.")
+        else:
+            print(f"Vecteur dupliqué pour {image_name}, aucune action prise.")
     # Supprimer les images traitées après la boucle
     if os.path.exists(img_path):
         os.remove(img_path)
-
-# Sauvegarder les données labellisées dans le fichier YAML
+            
+# Sauvegarder les données dans le fichier YAML
 with open(output_yaml, 'w') as f:
     yaml.dump(labeled_faces, f, default_flow_style=False)
 
-# Fermer toutes les fenêtres d'affichage
+print("Toutes les données ont été traitées et sauvegardées.")
 cv2.destroyAllWindows()
