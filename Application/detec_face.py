@@ -45,8 +45,8 @@ class CameraApp(App):
 
         # Charger la caméra
         self.capture = cv2.VideoCapture(0)
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 600)
+        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 420)
 
         # Initialisation des visages et des données
         self.faces_data_reel_time = []
@@ -63,7 +63,7 @@ class CameraApp(App):
         Clock.schedule_interval(self.update_reco_facial_image, 1.0 / 30)  # 30 FPS pour affichage secondaire
 
         # Charger les vecteurs caractéristiques
-        self.labeled_faces = self.load_yaml("../DeepFace/labeled_faces.yml")
+        self.labeled_faces = self.load_yaml("labeled_faces.yml")
 
         self.name_lbph, self.vector_lbph = self.load__vectors_lbph("lbph_bdd.dat")
 
