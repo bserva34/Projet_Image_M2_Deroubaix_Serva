@@ -73,14 +73,15 @@ class CameraApp(App):
 
         # Charger la caméra
         self.capture = cv2.VideoCapture(0)
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 600)
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 420)
+        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 620)
+        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 400)
 
         # Initialisation des visages et des données
         self.faces_data_reel_time = []
         self.faces_data_reco_facial = []
         self.faces_data_lbph = []
         self.last_embedding_time = 0
+        self.last_swap_time = 0
         self.last_extract_time = 0
         self.last_lbph_time =0
         self.detection_interval = 0.15 # Délai (en secondes) entre deux générations d'embeddings
@@ -196,7 +197,35 @@ class CameraApp(App):
                     #self.faces_data_reco_facial=self.faces_data_reel_time
                     self.update_embeddings(self.faces_data_reco_facial, frame)
                     self.last_embedding_time = current_time
+                elif current_time - self.last_swap_time > self.detection_interval:
+                    search_radius = 50  # Taille maximale d'une fenêtre pour chercher des visages proches
 
+                    for face_reco in self.faces_data_reco_facial:
+                        reco_x, reco_y, reco_w, reco_h = face_reco["rect"]
+                        reco_center = (reco_x + reco_w // 2, reco_y + reco_h // 2)
+                        closest_face = None
+                        min_distance = float('inf')
+
+                        # Limiter la recherche aux visages dans un rayon donné
+                        for face_real in self.faces_data_reel_time:
+                            real_x, real_y, real_w, real_h = face_real["rect"]
+                            real_center = (real_x + real_w // 2, real_y + real_h // 2)
+
+                            # Filtrer par distance approximative avant de calculer
+                            if abs(reco_center[0] - real_center[0]) > search_radius or abs(reco_center[1] - real_center[1]) > search_radius:
+                                continue
+
+                            # Calculer la distance exacte
+                            distance = ((real_center[0] - reco_center[0]) ** 2 + (real_center[1] - reco_center[1]) ** 2) ** 0.5
+
+                            if distance < min_distance:
+                                min_distance = distance
+                                closest_face = face_real
+
+                        # Mettre à jour la position si un visage proche est trouvé
+                        if closest_face:
+                            face_reco["rect"] = closest_face["rect"]
+                    self.last_swap_time = current_time
                 # Dessiner les rectangles avec les labels et distances
                 self.draw_faces(frame, self.faces_data_reco_facial, show_labels=True)
                 frame = cv2.flip(frame, 0)  # 0 pour retourner verticalement
@@ -246,17 +275,53 @@ class CameraApp(App):
 
     def update_lbph(self, faces_data, frame):
         for face in faces_data:
-            couleur = (0,255,0)
+            couleur = (0, 255, 0)
             x, y, w, h = face["rect"]
+            
+            # Extraire et recadrer le visage
             cropped_face = frame[y:y + h, x:x + w]
-            cropped_face = cv2.cvtColor(cropped_face, cv2.COLOR_BGR2GRAY)
+            
+            # Dimensions de l'image recadrée
+            face_h, face_w = cropped_face.shape[:2]
+            aspect_ratio = face_w / face_h
+            
+            # Redimensionner sans déformer
+            target_size = 100  # Taille cible
+            if aspect_ratio > 1:  # Largeur plus grande
+                new_width = target_size
+                new_height = int(target_size / aspect_ratio)
+            else:  # Hauteur plus grande ou égale
+                new_height = target_size
+                new_width = int(target_size * aspect_ratio)
+            
+            resized_face = cv2.resize(cropped_face, (new_width, new_height))
+
+            # Créer une image de 100x100 avec fond blanc
+            final_face = np.ones((target_size, target_size, 3), dtype=np.uint8) * 255  # Fond blanc
+
+            # Calculer la position pour centrer le visage redimensionné
+            y_offset = (target_size - new_height) // 2
+            x_offset = (target_size - new_width) // 2
+
+            # Placer l'image redimensionnée au centre
+            final_face[y_offset:y_offset + new_height, x_offset:x_offset + new_width] = resized_face
+
+            # Convertir en niveaux de gris pour l'analyse LBPH
+            cropped_face = cv2.cvtColor(final_face, cv2.COLOR_BGR2GRAY)
+            
+            # Calculer le vecteur LBPH
             test_vector = self.compute_lbph_vector(cropped_face)
+
+            # Trouver la correspondance la plus proche
             min_index, min_distance = self.find_closest_match(test_vector, self.vector_lbph)
-            if (min_distance > self.threshold_LBPH):
+            
+            if min_distance > self.threshold_LBPH:
                 label = "Inconnu"
-                couleur = (0,0,255)
-            else :
+                couleur = (0, 0, 255)
+            else:
                 label = self.name_lbph[min_index]
+            
+            # Mettre à jour les informations du visage
             face.update({
                 "embedding": test_vector,        
                 "label": label,                  
