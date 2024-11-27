@@ -37,7 +37,7 @@ version = 0.1
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy
+requirements = python3,kivy, opencv-python, deepface, numpy, scipy, pyyaml
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes
@@ -51,7 +51,7 @@ requirements = python3,kivy
 
 # (list) Supported orientations
 # Valid options are: landscape, portrait, portrait-reverse or landscape-reverse
-orientation = portrait
+#orientation = portrait
 
 # (list) List of service to declare
 #services = NAME:ENTRYPOINT_TO_PY,NAME2:ENTRYPOINT2_TO_PY
@@ -107,25 +107,32 @@ android.add_gradle_repositories = maven { url 'https://repo.maven.apache.org/mav
 #android.api = 31
 
 # (int) Minimum API your APK / AAB will support.
-#android.minapi = 21
+android.minapi = 21
 
 # (int) Android SDK version to use
 #android.sdk = 20
 
 # (str) Android NDK version to use
-#android.ndk = 21e
+android.ndk = True
+
+android.ndk_version = r25b
 
 # (int) Android NDK API to use. This is the minimum API your app will support, it should usually match android.minapi.
-#android.ndk_api = 21
+android.ndk_api = 31
 
 # (bool) Use --private data storage (True) or --dir public storage (False)
-#android.private_storage = True
+android.private_storage = True
 
-# (str) Android NDK directory (if empty, it will be automatically downloaded.)
-#android.ndk_path =
+# (str) Android NDK directory
+android.ndk_path = /home/bserva34/.buildozer/android/platform/android-ndk-r25b
 
-# (str) Android SDK directory (if empty, it will be automatically downloaded.)
-#android.sdk_path =
+
+
+# (str) Android SDK directory
+android.sdk_path = /home/bserva34/.buildozer/android/platform/android-sdk
+
+
+
 
 # (str) ANT directory (if empty, it will be automatically downloaded.)
 #android.ant_path =
@@ -140,6 +147,10 @@ android.add_gradle_repositories = maven { url 'https://repo.maven.apache.org/mav
 # the default, you will be shown the license when first running
 # buildozer.
 # android.accept_sdk_license = False
+
+# (list) Buildozer dependencies
+buildozer.android.libs = opencv-python
+
 
 # (str) Android entry point, default is ok for Kivy-based app
 #android.entrypoint = org.kivy.android.PythonActivity
@@ -171,6 +182,9 @@ android.add_gradle_repositories = maven { url 'https://repo.maven.apache.org/mav
 
 # (str) Path to a custom blacklist file
 #android.blacklist_src =
+
+# Spécifiez l'utilisation de gfortran dans le processus de compilation
+android.add_gfortran = 1
 
 # (list) List of Java .jar files to add to the libs so that pyjnius can access
 # their classes. Don't add jars that you do not need, since extra jars can slow
@@ -455,3 +469,9 @@ warn_on_root = 1
 #    Then, invoke the command line with the "demo" profile:
 #
 #buildozer --profile demo android debug
+
+[env]
+PATH = /home/bserva34/.buildozer/android/platform/android-ndk-r25b/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+
+
+
