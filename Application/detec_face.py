@@ -9,7 +9,8 @@ from kivy.uix.image import Image
 from kivy.uix.slider import Slider
 from kivy.uix.label import Label
 from kivy.clock import Clock
-
+from kivy.uix.popup import Popup
+from plyer import filechooser
 from kivy.graphics.texture import Texture
 from kivy.clock import Clock, mainthread
 import cv2
@@ -30,14 +31,17 @@ class CameraApp(App):
         button_layout = BoxLayout(orientation="vertical", size_hint=(0.2, 1))
         self.cnn_btn = Button(text="CNN (Off)")
         self.lbph_btn = Button(text="LBPH (Off)")
+        self.import_btn = Button(text="Import IMG")
         self.screenshot_btn = Button(text="Screenshot")
 
         # Associer les boutons à des fonctions
         self.cnn_active = False
         self.lbph_active = False
+        self.import_active = False
         self.screenshot_btn.bind(on_press=self.take_screenshots)
         self.cnn_btn.bind(on_press=self.toggle_cnn)
         self.lbph_btn.bind(on_press=self.toggle_lbph)
+        self.import_btn.bind(on_press=self.toggle_import)
         
         self.threshold_CNN = 0.06
         self.threshold_LBPH = 3.0
@@ -62,17 +66,18 @@ class CameraApp(App):
         button_layout.add_widget(cnn_slider_layout)
         button_layout.add_widget(self.lbph_btn)
         button_layout.add_widget(lbph_slider_layout)
+        button_layout.add_widget(self.import_btn)
         button_layout.add_widget(self.screenshot_btn)
 
         main_layout.add_widget(button_layout)
 
         # Layout des images à droite
-        image_layout = BoxLayout(orientation="vertical", size_hint=(0.8, 1))
+        self.image_layout = BoxLayout(orientation="vertical", size_hint=(0.8, 1))
         #self.reel_time_image = Image()
         self.reco_facial_image = Image()
         #image_layout.add_widget(self.reel_time_image)
-        image_layout.add_widget(self.reco_facial_image)
-        main_layout.add_widget(image_layout)
+        self.image_layout.add_widget(self.reco_facial_image)
+        main_layout.add_widget(self.image_layout)
 
         # Charger la caméra
         self.capture = cv2.VideoCapture(0)
@@ -91,8 +96,12 @@ class CameraApp(App):
         self.embedding_interval = 1.0  # Délai (en secondes) entre deux générations d'embeddings
         self.lbph_interval = 0.15
 
-        self.threshold_CNN = 0.075
-        self.threshold_LBPH = 3.0
+        self.previous_threshold_CNN = -1.0
+        self.previous_threshold_LBPH = -1.0
+
+        self.image = np.zeros((360, 640, 3), dtype=np.uint8)
+        self.initial_directory = os.getcwd()
+        self.extract_img=False
 
         Clock.schedule_interval(self.update_reel_time_image, 1.0 / 30)  # 30 FPS
         Clock.schedule_interval(self.update_reco_facial_image, 1.0 / 30)  # 30 FPS pour affichage secondaire
@@ -162,93 +171,159 @@ class CameraApp(App):
         self.cnn_btn.text = "CNN (On)" if self.cnn_active else "CNN (Off)"
         print(f"CNN mode {'enabled' if self.cnn_active else 'disabled'}.")
 
+    def toggle_import(self, instance=None):
+        self.import_active = not self.import_active
+        if self.import_active:
+            self.import_btn.text = "Retour mode caméra"
+            self.open_filechooser() 
+        else :
+            self.import_btn.text = "Import IMG"
+    
+    def open_filechooser(self):
+        current_directory = os.getcwd()
+        filechooser.open_file(on_selection=self.on_file_selected)
+        os.chdir(self.initial_directory)
+
+    def on_file_selected(self, selection):
+        print("on_file_selected triggered")  # Debugging statement
+        if selection:  # Check if a file is selected
+            self.image_path = selection[0]
+            print(f'You have selected: {self.image_path}')  # Debugging statement
+            self.image = cv2.imread(self.image_path)
+            self.image =  self.resize_with_padding(self.image ,640 , 480)
+            frame = cv2.flip(self.image, 0)
+            self.display_frame(frame, self.reco_facial_image)
+            self.extract_img=False
+            self.previous_threshold_CNN = -1.0
+            self.previous_threshold_LBPH = -1.0
+            self.lbph_active = False
+            self.lbph_btn.text = "LBPH (Off)"
+            self.cnn_active = False
+            self.cnn_btn.text = "CNN (Off)"
+        else:
+            self.toggle_import()
+            print("No file selected!")  
+
+    def resize_with_padding(self, image, target_width, target_height):
+        original_height, original_width = image.shape[:2]
+        aspect_ratio_original = original_width / original_height
+        aspect_ratio_target = target_width / target_height
+
+        if aspect_ratio_original > aspect_ratio_target:
+            new_width = target_width
+            new_height = int(target_width / aspect_ratio_original)
+        else:
+            new_height = target_height
+            new_width = int(target_height * aspect_ratio_original)
+
+        resized_image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
+
+        delta_w = target_width - new_width
+        delta_h = target_height - new_height
+        top, bottom = delta_h // 2, delta_h - (delta_h // 2)
+        left, right = delta_w // 2, delta_w - (delta_w // 2)
+
+        color = [0, 0, 0]  # Remplissage noir
+        padded_image = cv2.copyMakeBorder(resized_image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
+
+        return padded_image
+
     def update_reel_time_image(self, dt):
-        ret, frame = self.capture.read()
-        if ret:
-            if self.cnn_active or self.lbph_active:
-                #current_frame_count = int(self.capture.get(cv2.CAP_PROP_POS_FRAMES))
-                current_time = time.time()
-                # Appeler extract_faces toutes les 10 frames
-                #if current_frame_count % self.detection_interval == 0:
-                if current_time - self.last_extract_time > self.detection_interval:
-                    self.faces_data_reel_time = self.detect_faces(frame)
-                    self.last_extract_time = current_time
-
-                # Dessiner les rectangles avec les données existantes
-                # self.draw_faces(frame, self.faces_data_reel_time)
-
-                # frame = cv2.flip(frame, 0)  # 0 pour retourner verticalement
-                # self.display_frame(frame, self.reel_time_image)
-
-            # else:
-            #     frame = cv2.flip(frame, 0)  # 0 pour retourner verticalement
-            #     self.display_frame(frame, self.reel_time_image)
+        if self.import_active:
+            frame = self.image
+            self.faces_data_reel_time = self.detect_faces(frame)
+            self.extract_img = True
+        else :
+            ret, frame = self.capture.read()
+            if ret:
+                if self.cnn_active or self.lbph_active:
+                    current_time = time.time()
+                    if current_time - self.last_extract_time > self.detection_interval:
+                        self.faces_data_reel_time = self.detect_faces(frame)
+                        self.last_extract_time = current_time
 
 
 
     def update_reco_facial_image(self, dt):
-        ret, frame = self.capture.read()
-        if ret:
+        if self.import_active:
+            frame = copy.deepcopy(self.image)
             if self.cnn_active :
-                #current_frame_count = int(self.capture.get(cv2.CAP_PROP_POS_FRAMES))
-                current_time = time.time()
-
-                # Générer les embeddings toutes les secondes
-                #if current_frame_count % self.embedding_interval == 0:
-                if current_time - self.last_embedding_time > self.embedding_interval:
+                if self.threshold_CNN != self.previous_threshold_CNN:
                     self.faces_data_reco_facial = copy.deepcopy(self.faces_data_reel_time)
-                    #self.faces_data_reco_facial=self.faces_data_reel_time
                     self.update_embeddings(self.faces_data_reco_facial, frame)
-                    self.last_embedding_time = current_time
-                elif current_time - self.last_swap_time > self.detection_interval:
-                    search_radius = 50  # Taille maximale d'une fenêtre pour chercher des visages proches
-
-                    for face_reco in self.faces_data_reco_facial:
-                        reco_x, reco_y, reco_w, reco_h = face_reco["rect"]
-                        reco_center = (reco_x + reco_w // 2, reco_y + reco_h // 2)
-                        closest_face = None
-                        min_distance = float('inf')
-
-                        # Limiter la recherche aux visages dans un rayon donné
-                        for face_real in self.faces_data_reel_time:
-                            real_x, real_y, real_w, real_h = face_real["rect"]
-                            real_center = (real_x + real_w // 2, real_y + real_h // 2)
-
-                            # Filtrer par distance approximative avant de calculer
-                            if abs(reco_center[0] - real_center[0]) > search_radius or abs(reco_center[1] - real_center[1]) > search_radius:
-                                continue
-
-                            # Calculer la distance exacte
-                            distance = ((real_center[0] - reco_center[0]) ** 2 + (real_center[1] - reco_center[1]) ** 2) ** 0.5
-
-                            if distance < min_distance:
-                                min_distance = distance
-                                closest_face = face_real
-
-                        # Mettre à jour la position si un visage proche est trouvé
-                        if closest_face:
-                            face_reco["rect"] = closest_face["rect"]
-                    self.last_swap_time = current_time
-                # Dessiner les rectangles avec les labels et distances
+                    self.previous_threshold_CNN = self.threshold_CNN
                 self.draw_faces(frame, self.faces_data_reco_facial, show_labels=True)
-                frame = cv2.flip(frame, 0)  # 0 pour retourner verticalement
+                frame = cv2.flip(frame, 0)
                 self.display_frame(frame, self.reco_facial_image)
-            elif self.lbph_active:
-                current_time = time.time()
-
-                if current_time - self.last_lbph_time > self.lbph_interval:
+            elif self.lbph_active :
+                if self.threshold_LBPH != self.previous_threshold_LBPH:
                     self.faces_data_lbph = copy.deepcopy(self.faces_data_reel_time)
                     self.update_lbph(self.faces_data_lbph, frame)
-                    self.last_lbph_time = current_time
-
-                # Dessiner les rectangles avec les labels et distances
+                    self.previous_threshold_LBPH = self.threshold_LBPH
                 self.draw_faces(frame, self.faces_data_lbph, show_labels=True)
-                frame = cv2.flip(frame, 0)  # 0 pour retourner verticalement
+                frame = cv2.flip(frame, 0)
                 self.display_frame(frame, self.reco_facial_image)
-
             else:
                 frame = cv2.flip(frame, 0)  # 0 pour retourner verticalement
                 self.display_frame(frame, self.reco_facial_image)
+        else :
+            ret, frame = self.capture.read()
+            if ret:
+                if self.cnn_active :
+                    current_time = time.time()
+                    # Générer les embeddings toutes les secondes
+                    if current_time - self.last_embedding_time > self.embedding_interval:
+                        self.faces_data_reco_facial = copy.deepcopy(self.faces_data_reel_time)
+                        self.update_embeddings(self.faces_data_reco_facial, frame)
+                        self.last_embedding_time = current_time
+                    elif current_time - self.last_swap_time > self.detection_interval:
+                        search_radius = 50 
+                        for face_reco in self.faces_data_reco_facial:
+                            reco_x, reco_y, reco_w, reco_h = face_reco["rect"]
+                            reco_center = (reco_x + reco_w // 2, reco_y + reco_h // 2)
+                            closest_face = None
+                            min_distance = float('inf')
+
+                            # Limiter la recherche aux visages dans un rayon donné
+                            for face_real in self.faces_data_reel_time:
+                                real_x, real_y, real_w, real_h = face_real["rect"]
+                                real_center = (real_x + real_w // 2, real_y + real_h // 2)
+
+                                # Filtrer par distance approximative avant de calculer
+                                if abs(reco_center[0] - real_center[0]) > search_radius or abs(reco_center[1] - real_center[1]) > search_radius:
+                                    continue
+
+                                # Calculer la distance exacte
+                                distance = ((real_center[0] - reco_center[0]) ** 2 + (real_center[1] - reco_center[1]) ** 2) ** 0.5
+
+                                if distance < min_distance:
+                                    min_distance = distance
+                                    closest_face = face_real
+
+                            # Mettre à jour la position si un visage proche est trouvé
+                            if closest_face:
+                                face_reco["rect"] = closest_face["rect"]
+                        self.last_swap_time = current_time
+                    # Dessiner les rectangles avec les labels et distances
+                    self.draw_faces(frame, self.faces_data_reco_facial, show_labels=True)
+                    frame = cv2.flip(frame, 0)  # 0 pour retourner verticalement
+                    self.display_frame(frame, self.reco_facial_image)
+                elif self.lbph_active:
+                    current_time = time.time()
+
+                    if current_time - self.last_lbph_time > self.lbph_interval:
+                        self.faces_data_lbph = copy.deepcopy(self.faces_data_reel_time)
+                        self.update_lbph(self.faces_data_lbph, frame)
+                        self.last_lbph_time = current_time
+
+                    # Dessiner les rectangles avec les labels et distances
+                    self.draw_faces(frame, self.faces_data_lbph, show_labels=True)
+                    frame = cv2.flip(frame, 0)  # 0 pour retourner verticalement
+                    self.display_frame(frame, self.reco_facial_image)
+
+                else:
+                    frame = cv2.flip(frame, 0)  # 0 pour retourner verticalement
+                    self.display_frame(frame, self.reco_facial_image)
 
     def detect_faces(self, frame):
         try:
