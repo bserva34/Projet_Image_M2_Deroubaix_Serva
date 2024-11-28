@@ -149,7 +149,6 @@ class CameraApp(App):
         hist = recognizer.getHistograms()[0]
         return np.array(hist).flatten()
 
-
     def find_closest_match(self, test_vector, vectors):
         distances = np.linalg.norm(vectors - test_vector, axis=1)  # Distances euclidiennes
         min_index = np.argmin(distances)
@@ -241,8 +240,6 @@ class CameraApp(App):
                     if current_time - self.last_extract_time > self.detection_interval:
                         self.faces_data_reel_time = self.detect_faces(frame)
                         self.last_extract_time = current_time
-
-
 
     def update_reco_facial_image(self, dt):
         if self.import_active:
