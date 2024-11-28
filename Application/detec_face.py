@@ -18,6 +18,8 @@ import yaml
 from deepface import DeepFace
 from scipy.spatial.distance import cosine
 import copy
+import os
+from datetime import datetime
 
 class CameraApp(App):
     def build(self):
@@ -33,10 +35,11 @@ class CameraApp(App):
         # Associer les boutons à des fonctions
         self.cnn_active = False
         self.lbph_active = False
+        self.screenshot_btn.bind(on_press=self.take_screenshots)
         self.cnn_btn.bind(on_press=self.toggle_cnn)
         self.lbph_btn.bind(on_press=self.toggle_lbph)
         
-        self.threshold_CNN = 0.075
+        self.threshold_CNN = 0.06
         self.threshold_LBPH = 3.0
 
          # Ajout des sliders pour les seuils
@@ -374,8 +377,22 @@ class CameraApp(App):
         image_widget.texture = texture
 
     def take_screenshots(self, instance):
-        #self.save_widget_texture(self.reel_time_image, "screen_extract_face.jpg")
-        self.save_widget_texture(self.reco_facial_image, "screen_reco_facial.jpg")
+        # Créer un dossier "screen" s'il n'existe pas
+        folder = "screen"
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        
+        # Obtenir le label du visage détecté (s'il y en a un)
+        label = "unknown"
+        if self.faces_data_reco_facial:
+            label = self.faces_data_reco_facial[0]["label"]  # Utiliser le premier visage détecté pour le label
+        
+        # Générer un nom de fichier basé sur le label et l'heure actuelle
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{folder}/{label}_{timestamp}.jpg"
+
+        # Sauvegarder la texture du widget reco_facial_image
+        self.save_widget_texture(self.reco_facial_image, filename)
 
     def save_widget_texture(self, widget, filename):
         texture = widget.texture
