@@ -10,7 +10,7 @@ from kivy.uix.slider import Slider
 from kivy.uix.label import Label
 from kivy.clock import Clock
 from kivy.uix.popup import Popup
-from plyer import filechooser
+from kivy.uix.filechooser import FileChooserListView
 from kivy.graphics.texture import Texture
 from kivy.clock import Clock, mainthread
 import cv2
@@ -174,34 +174,65 @@ class CameraApp(App):
         self.import_active = not self.import_active
         if self.import_active:
             self.import_btn.text = "Retour mode caméra"
-            self.open_filechooser() 
-        else :
+            self.open_filechooser()
+        else:
             self.import_btn.text = "Import IMG"
-    
+
     def open_filechooser(self):
-        current_directory = os.getcwd()
-        filechooser.open_file(on_selection=self.on_file_selected)
-        os.chdir(self.initial_directory)
+        # Create a FileChooser widget
+        file_chooser = FileChooserListView(path=os.getcwd(), filters=['*.png', '*.jpg', '*.jpeg'])
+
+        # Create buttons for file selection
+        btn_select = Button(text="Select", size_hint=(1, 0.2))
+        btn_cancel = Button(text="Cancel", size_hint=(1, 0.2))
+
+        # Layout for the popup content
+        popup_layout = BoxLayout(orientation="vertical")
+        popup_layout.add_widget(file_chooser)
+        popup_btns = BoxLayout(size_hint=(1, 0.2))
+        popup_btns.add_widget(btn_cancel)
+        popup_btns.add_widget(btn_select)
+        popup_layout.add_widget(popup_btns)
+
+        # Create a popup
+        self.popup = Popup(title="Select a File", content=popup_layout, size_hint=(0.9, 0.9))
+        self.popup.open()
+
+        # Bind buttons
+        btn_select.bind(on_release=lambda _: self.on_file_selected(file_chooser.selection))
+        btn_cancel.bind(on_release=lambda _: self.on_file_not_selected())
+
+    def on_file_not_selected(self):
+        self.import_active = False
+        self.import_btn.text = "Import IMG"
+        self.popup.dismiss()
+
 
     def on_file_selected(self, selection):
-        print("on_file_selected triggered")  # Debugging statement
-        if selection:  # Check if a file is selected
+        if selection:
             self.image_path = selection[0]
-            print(f'You have selected: {self.image_path}')  # Debugging statement
+            print(f"You have selected: {self.image_path}")  # Debugging statement
+            
+            # Load and display the image
             self.image = cv2.imread(self.image_path)
-            self.image =  self.resize_with_padding(self.image ,640 , 480)
-            frame = cv2.flip(self.image, 0)
+            self.image = self.resize_with_padding(self.image, 640, 480)
+            frame = cv2.flip(self.image, 0)  # Simulate flipping the image
             self.display_frame(frame, self.reco_facial_image)
-            self.extract_img=False
+
+            # Reset flags
+            self.extract_img = False
             self.previous_threshold_CNN = -1.0
             self.previous_threshold_LBPH = -1.0
             self.lbph_active = False
-            self.lbph_btn.text = "LBPH (Off)"
             self.cnn_active = False
-            self.cnn_btn.text = "CNN (Off)"
+
+            # Update button states
+            self.import_btn.text = "Retour mode camera"
+            self.popup.dismiss()
         else:
-            self.toggle_import()
-            print("No file selected!")  
+            print("No file selected!")
+            self.import_btn.text = "Import IMG"
+            self.popup.dismiss()
 
     def resize_with_padding(self, image, target_width, target_height):
         original_height, original_width = image.shape[:2]
