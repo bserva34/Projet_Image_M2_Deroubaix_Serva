@@ -33,18 +33,25 @@ class CameraApp(App):
         self.lbph_btn = Button(text="LBPH (Off)")
         self.import_btn = Button(text="Import IMG")
         self.screenshot_btn = Button(text="Screenshot")
+        self.surveillance_btn = Button(text="Activer la surveillance")
+
+        self.screenshot_mode = True
 
         # Associer les boutons à des fonctions
         self.cnn_active = False
         self.lbph_active = False
         self.import_active = False
+        self.surveillance_active = False
         self.screenshot_btn.bind(on_press=self.take_screenshots)
         self.cnn_btn.bind(on_press=self.toggle_cnn)
         self.lbph_btn.bind(on_press=self.toggle_lbph)
         self.import_btn.bind(on_press=self.toggle_import)
+        self.surveillance_btn.bind(on_press=self.toggle_surveillance)
         
         self.threshold_CNN = 0.06
         self.threshold_LBPH = 3.0
+
+        self.detected_labels = []
 
          # Ajout des sliders pour les seuils
         cnn_slider_layout = BoxLayout(orientation="vertical")
@@ -68,6 +75,7 @@ class CameraApp(App):
         button_layout.add_widget(lbph_slider_layout)
         button_layout.add_widget(self.import_btn)
         button_layout.add_widget(self.screenshot_btn)
+        button_layout.add_widget(self.surveillance_btn)
 
         main_layout.add_widget(button_layout)
 
@@ -107,7 +115,7 @@ class CameraApp(App):
         Clock.schedule_interval(self.update_reco_facial_image, 1.0 / 30)  # 30 FPS pour affichage secondaire
 
         # Charger les vecteurs caractéristiques
-        self.labeled_faces = self.load_yaml("labeled_faces.yml")
+        self.labeled_faces = self.load_yaml("labeled_faces_withCeleb.yml")
 
         self.name_lbph, self.vector_lbph = self.load__vectors_lbph("lbph_bdd.dat")
 
@@ -177,6 +185,40 @@ class CameraApp(App):
             self.open_filechooser()
         else:
             self.import_btn.text = "Import IMG"
+
+    def toggle_surveillance(self, instance=None):
+        # Activer ou désactiver la surveillance
+        self.surveillance_active = not self.surveillance_active
+        self.surveillance_btn.text = "Surveillance en cours" if self.surveillance_active else "Activer la surveillance"
+
+        if self.surveillance_active:
+            # Activer le mode CNN
+            self.cnn_active = True
+            self.lbph_active = False
+            self.cnn_btn.text = "CNN (On)"
+            self.lbph_btn.text = "LBPH (Off)"
+            self.screenshot_mode = False
+            
+            # Réinitialiser le tableau des labels détectés
+            self.detected_labels = []
+            
+            print("Surveillance activée. Réinitialisation des labels détectés.")
+        else:
+            # Désactiver CNN
+            self.cnn_active = False
+            self.lbph_active = False
+            self.cnn_btn.text = "CNN (Off)"
+            self.screenshot_mode = True
+            print("Surveillance désactivée.")
+
+    def check_surveillance(self,label):
+        if self.detected_labels:
+            labels = [face for face in self.detected_labels]  # Récupérer tous les labels
+            for i in labels:
+                if(i==label):
+                    return False
+        return True
+
 
     def open_filechooser(self):
         # Create a FileChooser widget
@@ -336,6 +378,15 @@ class CameraApp(App):
                     self.draw_faces(frame, self.faces_data_reco_facial, show_labels=True)
                     frame = cv2.flip(frame, 0)  # 0 pour retourner verticalement
                     self.display_frame(frame, self.reco_facial_image)
+                    
+                    if self.surveillance_active:
+                        if self.faces_data_reco_facial:
+                            labels = [face["label"] for face in self.faces_data_reco_facial]  # Récupérer tous les labels
+                            for l in labels:
+                                if (self.check_surveillance(l)):
+                                    self.detected_labels.append(l)
+                                    self.take_screenshots(None)
+
                 elif self.lbph_active:
                     current_time = time.time()
 
@@ -480,22 +531,27 @@ class CameraApp(App):
         image_widget.texture = texture
 
     def take_screenshots(self, instance):
-        # Créer un dossier "screen" s'il n'existe pas
-        folder = "screen"
+        mode = self.screenshot_mode
+        folder = "screen" if mode else "surveillance"
         if not os.path.exists(folder):
             os.makedirs(folder)
+
         
-        # Obtenir le label du visage détecté (s'il y en a un)
-        label = "unknown"
+        # Obtenir tous les labels des visages détectés
+        labels = ["unknown"]
         if self.faces_data_reco_facial:
-            label = self.faces_data_reco_facial[0]["label"]  # Utiliser le premier visage détecté pour le label
-        
-        # Générer un nom de fichier basé sur le label et l'heure actuelle
+            labels = [face["label"] for face in self.faces_data_reco_facial]  # Récupérer tous les labels
+
+        # Créer une chaîne avec tous les labels, séparés par des underscores
+        label_str = "_".join(labels)
+
+        # Générer un nom de fichier basé sur les labels et l'heure actuelle
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{folder}/{label}_{timestamp}.jpg"
+        filename = f"{folder}/{label_str}_{timestamp}.jpg"
 
         # Sauvegarder la texture du widget reco_facial_image
         self.save_widget_texture(self.reco_facial_image, filename)
+
 
     def save_widget_texture(self, widget, filename):
         texture = widget.texture
