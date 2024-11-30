@@ -3,7 +3,7 @@
 clear
 
 # Dossier contenant les images à tester
-input_folder="../../BDD/40_personnes_test"
+input_folder="../../../../bbd_image/Imagette_For_LBPH/Imagette_a_comparer"
 result_file="res_lbph_v2.txt"
 
 # Vider le fichier de résultats s'il existe déjà

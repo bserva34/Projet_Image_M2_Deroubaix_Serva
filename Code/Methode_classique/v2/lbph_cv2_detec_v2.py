@@ -9,7 +9,7 @@ parser.add_argument("input_image_path", type=str, help="Chemin de l'image à tes
 args = parser.parse_args()
 
 # Chemin vers le fichier de vecteurs moyens
-output_dat_file = "vectors_global.dat"
+output_dat_file = "lbph_bdd.dat"
 
 # Fonction pour charger les vecteurs moyens depuis le fichier
 def load_average_vectors(file_path):
