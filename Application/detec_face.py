@@ -377,6 +377,8 @@ class CameraApp(App):
             print("Surveillance désactivée.")
 
     def check_surveillance(self,label):
+        if (label=='Inconnu'):
+            return False
         if self.detected_labels:
             labels = [face for face in self.detected_labels]  # Récupérer tous les labels
             for i in labels:
