@@ -22,11 +22,11 @@ Pour lancer l'application de reconnaissance faciale, exécutez ce script Python 
 
 ## Fonctionnalité
 
-  -Reconnaissance faciale par CNN (deepface/dlib) sur une base de donnée local (YML) avec un seuil variable.
-  -Reconnaissance faciale par LBPH (opencv) sur une base de donnée local (dat) avec un seuil variable.
-  -2 Modes: Caméra & Image importé.
-  -Option surveillance pour récuperer l'heure.
-  -Screenshot de l'image courante.
+  -Reconnaissance faciale par CNN (deepface/dlib) sur une base de donnée local (YML) avec un seuil variable. \n
+  -Reconnaissance faciale par LBPH (opencv) sur une base de donnée local (dat) avec un seuil variable. \n
+  -2 Modes: Caméra & Image importé. \n
+  -Option surveillance pour récuperer l'heure. \n
+  -Screenshot de l'image courante. \n
 
 ## Ajout de visage à la base de donnée
 
