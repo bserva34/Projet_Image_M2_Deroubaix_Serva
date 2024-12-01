@@ -13,6 +13,13 @@ from kivy.uix.popup import Popup
 from kivy.uix.filechooser import FileChooserListView
 from kivy.graphics.texture import Texture
 from kivy.clock import Clock, mainthread
+from kivy.uix.tabbedpanel import TabbedPanel
+from kivy.uix.dropdown import DropDown
+from kivy.uix.gridlayout import GridLayout
+from kivy.uix.image import Image
+from kivy.graphics import Color, Rectangle
+
+
 import cv2
 import numpy as np
 import yaml
@@ -24,75 +31,16 @@ from datetime import datetime
 
 class CameraApp(App):
     def build(self):
+        self.Color1 = (0.1, 0.5, 1, 1)
+        self.ColorFooter = (0.1, 0.5, 1, 0.3)
+        self.Color2 = (0.1, 0.1, 1, 1)
+        self.ColorSurveillance = (1,0,0,1)
         # Layout principal
-        main_layout = BoxLayout(orientation="horizontal")
-
-        # Boutons à gauche
-        button_layout = BoxLayout(orientation="vertical", size_hint=(0.2, 1))
-        self.cnn_btn = Button(text="CNN (Off)")
-        self.lbph_btn = Button(text="LBPH (Off)")
-        self.import_btn = Button(text="Import IMG")
-        self.screenshot_btn = Button(text="Screenshot")
-        self.surveillance_btn = Button(text="Activer la surveillance")
-
-        self.screenshot_mode = True
-
-        # Associer les boutons à des fonctions
-        self.cnn_active = False
-        self.lbph_active = False
-        self.import_active = False
-        self.surveillance_active = False
-        self.screenshot_btn.bind(on_press=self.take_screenshots)
-        self.cnn_btn.bind(on_press=self.toggle_cnn)
-        self.lbph_btn.bind(on_press=self.toggle_lbph)
-        self.import_btn.bind(on_press=self.toggle_import)
-        self.surveillance_btn.bind(on_press=self.toggle_surveillance)
-        
-        self.threshold_CNN = 0.06
-        self.threshold_LBPH = 3.0
-
-        self.detected_labels = []
-
-         # Ajout des sliders pour les seuils
-        cnn_slider_layout = BoxLayout(orientation="vertical")
-        self.cnn_slider_label = Label(text=f"Threshold CNN: {self.threshold_CNN:.3f}", size_hint=(1, 0.2))
-        self.cnn_slider = Slider(min=0.01, max=0.10, value=self.threshold_CNN, size_hint=(1, 0.8))
-        self.cnn_slider.bind(value=self.update_cnn_threshold)
-        cnn_slider_layout.add_widget(self.cnn_slider_label)
-        cnn_slider_layout.add_widget(self.cnn_slider)
-
-        lbph_slider_layout = BoxLayout(orientation="vertical")
-        self.lbph_slider_label = Label(text=f"Threshold LBPH: {self.threshold_LBPH:.2f}", size_hint=(1, 0.2))
-        self.lbph_slider = Slider(min=1.0, max=5.0, value=self.threshold_LBPH, size_hint=(1, 0.8))
-        self.lbph_slider.bind(value=self.update_lbph_threshold)
-        lbph_slider_layout.add_widget(self.lbph_slider_label)
-        lbph_slider_layout.add_widget(self.lbph_slider)
-
-        # Ajout des widgets au layout des boutons
-        button_layout.add_widget(self.cnn_btn)
-        button_layout.add_widget(cnn_slider_layout)
-        button_layout.add_widget(self.lbph_btn)
-        button_layout.add_widget(lbph_slider_layout)
-        button_layout.add_widget(self.import_btn)
-        button_layout.add_widget(self.screenshot_btn)
-        button_layout.add_widget(self.surveillance_btn)
-
-        main_layout.add_widget(button_layout)
-
-        # Layout des images à droite
-        self.image_layout = BoxLayout(orientation="vertical", size_hint=(0.8, 1))
-        #self.reel_time_image = Image()
-        self.reco_facial_image = Image()
-        #image_layout.add_widget(self.reel_time_image)
-        self.image_layout.add_widget(self.reco_facial_image)
-        main_layout.add_widget(self.image_layout)
-
-        # Charger la caméra
-        self.capture = cv2.VideoCapture(0)
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+        main_layout = BoxLayout(orientation="vertical")
 
         # Initialisation des visages et des données
+        self.threshold_CNN = 0.06
+        self.threshold_LBPH = 3.0
         self.faces_data_reel_time = []
         self.faces_data_reco_facial = []
         self.faces_data_lbph = []
@@ -100,26 +48,175 @@ class CameraApp(App):
         self.last_swap_time = 0
         self.last_extract_time = 0
         self.last_lbph_time =0
-        self.detection_interval = 0.15 # Délai (en secondes) entre deux générations d'embeddings
-        self.embedding_interval = 1.0  # Délai (en secondes) entre deux générations d'embeddings
-        self.lbph_interval = 0.15
+        self.detection_interval = 0.24 # Délai (en secondes) entre deux générations d'embeddings
+        self.embedding_interval = 1.1  
+        self.lbph_interval = 0.24
 
         self.previous_threshold_CNN = -1.0
         self.previous_threshold_LBPH = -1.0
 
+        # Barre personnalisée en haut
+        custom_bar = self.create_custom_bar()
+        main_layout.add_widget(custom_bar)
+
+        # Body  bouton a gauche & camera a droite
+        body_layout = BoxLayout(orientation="horizontal")
+
+        # Boutons à gauche
+        button_layout = self.create_button_panel()
+        body_layout.add_widget(button_layout)
+
+        self.screenshot_mode = True
+        self.cnn_active = False
+        self.lbph_active = False
+        self.import_active = False
+        self.surveillance_active = False
+        
+        self.detected_labels = []
+
+        # Layout des images à droite
+        self.image_layout = self.create_image_panel()
+        body_layout.add_widget(self.image_layout)
+
+        main_layout.add_widget(body_layout)
+
+        # Footer en bas
+        footer = self.create_footer()
+        main_layout.add_widget(footer)
+        
         self.image = np.zeros((360, 640, 3), dtype=np.uint8)
         self.initial_directory = os.getcwd()
         self.extract_img=False
 
-        Clock.schedule_interval(self.update_reel_time_image, 1.0 / 30)  # 30 FPS
-        Clock.schedule_interval(self.update_reco_facial_image, 1.0 / 30)  # 30 FPS pour affichage secondaire
-
         # Charger les vecteurs caractéristiques
         self.labeled_faces = self.load_yaml("labeled_faces_withCeleb.yml")
-
         self.name_lbph, self.vector_lbph = self.load__vectors_lbph("lbph_bdd.dat")
 
+        self.initialize_camera()
+
         return main_layout
+
+    def create_button_panel(self):
+        button_layout = BoxLayout(orientation="vertical", size_hint=(0.2, 1), padding=2, spacing=2)
+
+        # Buttons
+        self.cnn_btn = Button(text="CNN (Off)", on_press=self.toggle_cnn, 
+            background_color=self.Color1,
+            color=(1, 1, 1, 1))
+        self.lbph_btn = Button(text="LBPH (Off)", on_press=self.toggle_lbph, 
+            background_color=self.Color1,
+            color=(1, 1, 1, 1))
+        self.screenshot_btn = Button(text="Screenshot", on_press=self.take_screenshots, 
+            background_color=self.Color1,
+            color=(1, 1, 1, 1))
+
+        # Ajout des sliders pour les seuils
+        cnn_slider_layout = BoxLayout(orientation="vertical", size_hint=(1.0,0.33), padding=2, spacing=2)
+        self.cnn_slider_label = Label(text=f"Threshold CNN: {self.threshold_CNN:.3f}", size_hint=(1, 0.2))
+        self.cnn_slider = Slider(min=0.01, max=0.10, value=self.threshold_CNN, size_hint=(1, 0.8))
+        self.cnn_slider.bind(value=self.update_cnn_threshold)
+        cnn_slider_layout.add_widget(self.cnn_slider_label)
+        cnn_slider_layout.add_widget(self.cnn_slider)
+
+        lbph_slider_layout = BoxLayout(orientation="vertical", size_hint=(1, 0.33), padding=2, spacing=2)
+        self.lbph_slider_label = Label(text=f"Threshold LBPH: {self.threshold_LBPH:.2f}", size_hint=(1, 0.2))
+        self.lbph_slider = Slider(min=1.0, max=5.0, value=self.threshold_LBPH, size_hint=(1, 0.8))
+        self.lbph_slider.bind(value=self.update_lbph_threshold)
+        lbph_slider_layout.add_widget(self.lbph_slider_label)
+        lbph_slider_layout.add_widget(self.lbph_slider)
+
+        # Add buttons to the layout
+        button_layout.add_widget(self.cnn_btn)
+        button_layout.add_widget(cnn_slider_layout)
+        button_layout.add_widget(self.lbph_btn)
+        button_layout.add_widget(lbph_slider_layout)
+        button_layout.add_widget(self.screenshot_btn)
+
+        return button_layout
+
+    def create_image_panel(self):
+        image_layout = BoxLayout(orientation="vertical", size_hint=(0.8, 1), padding=0, spacing=0)
+        self.reco_facial_image = Image()
+        image_layout.add_widget(self.reco_facial_image)
+        return image_layout
+
+    def create_custom_bar(self):
+        # Barre principale horizontale
+        custom_bar = BoxLayout(orientation="horizontal", size_hint=(1, 0.08), padding=1, spacing=1)
+
+        # Bouton Import IMG
+        self.import_btn = Button(
+            text="Import IMG",
+            size_hint=(0.2, 1),
+            background_color=self.Color2,
+            color=(1, 1, 1, 1)
+        )
+        self.import_btn.bind(on_press=self.toggle_import)
+        custom_bar.add_widget(self.import_btn)
+
+        self.surveillance_btn = Button(text="Activer la surveillance", on_press=self.toggle_surveillance, 
+            background_color=self.Color1,
+            size_hint=(0.6, 1),
+            color=(1, 1, 1, 1))
+        custom_bar.add_widget(self.surveillance_btn)
+
+        self.mode_cam_btn = Button(
+            text="Mode Camera (On)",
+            size_hint=(0.2, 1),
+            background_color=self.Color1,
+            color=(1, 1, 1, 1)
+        )
+        self.mode_cam_btn.bind(on_press=self.toggle_Cam)
+        custom_bar.add_widget(self.mode_cam_btn)
+
+        return custom_bar
+
+    def create_footer(self):
+        # Layout horizontal pour le footer
+        footer = BoxLayout(orientation="horizontal", size_hint=(1, 0.13), padding=6, spacing=6)
+
+        with footer.canvas.before:
+            Color(*self.ColorFooter)
+            self.footer_bg = Rectangle(size=footer.size, pos=footer.pos)
+        
+        # Update the Rectangle size and position when the footer changes
+        footer.bind(size=self.update_footer_background, pos=self.update_footer_background)
+        
+        # Icône (utilise une image PNG, par exemple 'icon.png' dans le répertoire)
+        icon = Image(source="icon/univ.png", size_hint=(None, 1))
+        footer.add_widget(icon)
+        
+        # Texte
+        footer_label = Label(
+            text=(
+                "Application par "
+                "[b]Benjamin Serva[/b] & [b]Renaud Deroubaix[/b] "
+                "pour l'UE HAI927I: Projet Image, Master Imagine"
+            ),
+            halign="center",
+            valign="middle",
+            size_hint=(1, 1),
+            color=(1, 1, 1, 1), 
+            markup=True  # Activer le formatage HTML
+        )
+        footer_label.bind(size=footer_label.setter('text_size'))  # Ajuste le texte automatiquement
+        footer.add_widget(footer_label)
+        
+        return footer
+
+    def update_footer_background(self, instance, value):
+        self.footer_bg.size = instance.size
+        self.footer_bg.pos = instance.pos
+
+
+    def initialize_camera(self):
+        self.capture = cv2.VideoCapture(0)
+        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+
+        # Schedule updates
+        Clock.schedule_interval(self.update_reel_time_image, 1.0 / 24)  # 30 FPS
+        Clock.schedule_interval(self.update_reco_facial_image, 1.0 / 24)  # 30 FPS for secondary display
 
     def update_cnn_threshold(self, instance, value):
         self.threshold_CNN = value
@@ -179,20 +276,24 @@ class CameraApp(App):
         print(f"CNN mode {'enabled' if self.cnn_active else 'disabled'}.")
 
     def toggle_import(self, instance=None):
-        self.import_active = not self.import_active
-        if self.import_active:
-            self.import_btn.text = "Retour mode caméra"
-            self.open_filechooser()
-        else:
-            self.import_btn.text = "Import IMG"
+        self.import_active = True
+        self.mode_cam_btn.text = "Mode Camera (Off)"
+        self.open_filechooser()
+
+    def toggle_Cam(self, instance=None):
+        self.mode_cam_btn.text = "Mode Camera (On)"
+        self.import_active = False
 
     def toggle_surveillance(self, instance=None):
         # Activer ou désactiver la surveillance
         self.surveillance_active = not self.surveillance_active
         self.surveillance_btn.text = "Surveillance en cours" if self.surveillance_active else "Activer la surveillance"
 
+
+
         if self.surveillance_active:
             # Activer le mode CNN
+            instance.background_color = self.ColorSurveillance
             self.cnn_active = True
             self.lbph_active = False
             self.cnn_btn.text = "CNN (On)"
@@ -205,6 +306,7 @@ class CameraApp(App):
             print("Surveillance activée. Réinitialisation des labels détectés.")
         else:
             # Désactiver CNN
+            instance.background_color = self.Color1
             self.cnn_active = False
             self.lbph_active = False
             self.cnn_btn.text = "CNN (Off)"
@@ -246,7 +348,7 @@ class CameraApp(App):
 
     def on_file_not_selected(self):
         self.import_active = False
-        self.import_btn.text = "Import IMG"
+        self.mode_cam_btn.text = "Mode Camera (On)"
         self.popup.dismiss()
 
 
@@ -269,11 +371,11 @@ class CameraApp(App):
             self.cnn_active = False
 
             # Update button states
-            self.import_btn.text = "Retour mode camera"
             self.popup.dismiss()
         else:
             print("No file selected!")
-            self.import_btn.text = "Import IMG"
+            self.import_active = False
+            self.mode_cam_btn.text = "Mode Camera (On)"
             self.popup.dismiss()
 
     def resize_with_padding(self, image, target_width, target_height):
