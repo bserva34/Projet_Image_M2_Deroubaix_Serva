@@ -325,7 +325,10 @@ class CameraApp(App):
         self.open_filechooser()
 
     def toggle_add_to_YML(self, instance=None):
-        ret, frame = self.capture.read()
+        if self.import_active :
+            frame = self.image
+        else:
+            ret, frame = self.capture.read()
         faces_data = self.detect_faces(frame)
         self.cnn_active = False
         self.cnn_btn.text = "CNN (Off)"
