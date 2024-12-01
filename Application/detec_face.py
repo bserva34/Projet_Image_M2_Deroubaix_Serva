@@ -18,7 +18,7 @@ from kivy.uix.dropdown import DropDown
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.image import Image
 from kivy.graphics import Color, Rectangle
-
+from kivy.uix.textinput import TextInput
 
 import cv2
 import numpy as np
@@ -31,6 +31,7 @@ from datetime import datetime
 
 class CameraApp(App):
     def build(self):
+        self.yml_path = "labeled_faces_withCeleb.yml"
         self.Color1 = (0.1, 0.5, 1, 1)
         self.ColorFooter = (0.1, 0.5, 1, 0.3)
         self.Color2 = (0.1, 0.1, 1, 1)
@@ -89,7 +90,7 @@ class CameraApp(App):
         self.extract_img=False
 
         # Charger les vecteurs caractéristiques
-        self.labeled_faces = self.load_yaml("labeled_faces_withCeleb.yml")
+        self.labeled_faces = self.load_yaml(self.yml_path)
         self.name_lbph, self.vector_lbph = self.load__vectors_lbph("lbph_bdd.dat")
 
         self.initialize_camera()
@@ -104,6 +105,9 @@ class CameraApp(App):
             background_color=self.Color1,
             color=(1, 1, 1, 1))
         self.lbph_btn = Button(text="LBPH (Off)", on_press=self.toggle_lbph, 
+            background_color=self.Color1,
+            color=(1, 1, 1, 1))
+        self.add_to_YML_btn = Button(text="Ajout à la BDD", on_press=self.toggle_add_to_YML, 
             background_color=self.Color1,
             color=(1, 1, 1, 1))
         self.screenshot_btn = Button(text="Screenshot", on_press=self.take_screenshots, 
@@ -130,6 +134,7 @@ class CameraApp(App):
         button_layout.add_widget(cnn_slider_layout)
         button_layout.add_widget(self.lbph_btn)
         button_layout.add_widget(lbph_slider_layout)
+        button_layout.add_widget(self.add_to_YML_btn)
         button_layout.add_widget(self.screenshot_btn)
 
         return button_layout
@@ -235,6 +240,45 @@ class CameraApp(App):
             print(f"Erreur lors du chargement du fichier YAML : {e}")
             return {}
 
+    def add_face_to_yml(self, face, popup):
+        label = self.label_input.text.strip()
+        
+        if label:
+            # Charge le fichier YAML existant
+            yml_path = self.yml_path
+            data = self.labeled_faces
+
+            # Crée ou met à jour l'entrée pour le label dans le YML
+            if label not in data:
+                data[label] = []
+
+            # Ajoute les visages détectés à ce label
+            try:
+                embedding = DeepFace.represent(
+                        face,
+                        detector_backend="skip",
+                        model_name="Dlib",
+                        enforce_detection=True,
+                        align=True,
+                    )[0]["embedding"]
+                face_data = {
+                        "image": "from_app_no_img",  # Le nom d'image pour l'app
+                        "vector": embedding,  # Assure-toi d'extraire les embeddings si nécessaire
+                }
+                data[label].append(face_data)
+
+                # Sauvegarde le fichier YAML avec les nouveaux ajouts
+                with open(yml_path, "w") as file:
+                    yaml.dump(data, file)
+                
+                print(f"Visage ajouté sous le label '{label}' dans {yml_path}")
+            except Exception as e:
+                print(f"Erreur lors de la génération de l'embedding : {e}")
+            popup.dismiss()
+        else:
+            print("Labellisation annulée.")
+            popup.dismiss()
+
     def load__vectors_lbph(self, file_path):
         vectors = []
         names = []
@@ -279,6 +323,22 @@ class CameraApp(App):
         self.import_active = True
         self.mode_cam_btn.text = "Mode Camera (Off)"
         self.open_filechooser()
+
+    def toggle_add_to_YML(self, instance=None):
+        ret, frame = self.capture.read()
+        faces_data = self.detect_faces(frame)
+        self.cnn_active = False
+        self.cnn_btn.text = "CNN (Off)"
+        self.lbph_active = False
+        self.lbph_btn.text = "LBPH (Off)"
+
+        if faces_data:
+            self.faces = faces_data  # Stocke les visages détectés
+            # Pour chaque visage détecté, ouvre une fenêtre pour l'afficher
+            for i, face in enumerate(self.faces):
+                self.show_face_popup(face, frame, i)
+        else:
+            print("Aucun visage détecté.")
 
     def toggle_Cam(self, instance=None):
         self.mode_cam_btn.text = "Mode Camera (On)"
@@ -684,6 +744,48 @@ class CameraApp(App):
             color = (0, 0, 255)
             closest_label = "Inconnu"
         return closest_label, color, min_distance
+
+    def show_face_popup(self, face, frame, index):
+        # Découpe l'image du visage à partir des coordonnées (x, y, w, h)
+        x, y, w, h = face["rect"]
+        face_img = frame[y:y+h, x:x+w]  # Découpe l'image pour chaque visage
+
+        # Convertir l'image OpenCV en format que Kivy peut afficher
+        face_img_rgb = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)  # Conversion OpenCV -> RGB
+        face_img_rgb = cv2.flip(face_img_rgb,0)
+
+        # Créer une texture Kivy à partir de l'image RGB
+        face_texture = Texture.create(size=(face_img_rgb.shape[1], face_img_rgb.shape[0]), colorfmt='rgb')
+        face_texture.blit_buffer(face_img_rgb.tobytes(), colorfmt='rgb', bufferfmt='ubyte')
+
+        # Crée un Image widget de Kivy pour afficher l'image découpée
+        face_widget = Image(size_hint=(1.0, 1.0))
+        face_widget.texture = face_texture  # Assignation de la texture
+
+        # Crée un Popup Kivy avec tous les éléments
+        popup_layout = BoxLayout(orientation="vertical")
+        popup_layout_btn = BoxLayout(orientation="horizontal", size_hint=(1.0,0.3))
+        popup = Popup(title=f"Labéliser le Visage: ", content=popup_layout, size_hint=(0.5, 0.5))
+        
+        # Crée un input text pour que l'utilisateur entre un label
+        self.label_input = TextInput(hint_text="Entrez un label pour ce visage", multiline=False, size_hint=(1.0,1.0))
+        label_button = Button(text="Ajouter au YML", size_hint=(1, 1.0),background_color=self.Color1,
+            color=(1, 1, 1, 1))
+        label_button.bind(on_press=lambda instance: self.add_face_to_yml(face_img, popup))
+
+        # Crée un bouton Quitter pour fermer le popup
+        quit_button = Button(text="Quitter", size_hint=(1, 1.0),background_color=self.Color1,
+            color=(1, 1, 1, 1))
+        quit_button.bind(on_press=lambda instance: popup.dismiss())
+
+        # Organise tous les éléments dans une BoxLayout
+        popup_layout.add_widget(face_widget)  # Affiche l'image du visage
+        popup_layout.add_widget(self.label_input)  # Ajoute l'input texte
+        popup_layout_btn.add_widget(quit_button)  # Bouton pour quitter le popup
+        popup_layout_btn.add_widget(label_button)  # Bouton pour ajouter le visage au YML
+        popup_layout.add_widget(popup_layout_btn)
+
+        popup.open()
 
     def on_stop(self):
         self.capture.release()
