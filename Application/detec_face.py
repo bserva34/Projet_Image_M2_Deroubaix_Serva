@@ -20,6 +20,7 @@ from kivy.uix.image import Image
 from kivy.graphics import Color, Rectangle
 from kivy.uix.textinput import TextInput
 from kivy.uix.spinner import Spinner
+from kivy.core.window import Window
 
 
 import cv2
@@ -33,6 +34,10 @@ from datetime import datetime
 
 class CameraApp(App):
     def build(self):
+
+        self.icon = 'icon/logo.png'  # Remplacez par le chemin de votre fichier logo
+        self.title = "DetecFace"
+
         self.yml_path = "labeled_faces_withCeleb.yml"
         self.Color1 = (0.1, 0.5, 1, 1)
         self.ColorFooter = (0.1, 0.5, 1, 0.3)
@@ -820,7 +825,10 @@ class CameraApp(App):
             else:
                 self.label_input.opacity = 0  # Masque la zone de texte
                 self.label_input.disabled = True
+                self.label_input.text = text
+            print(f"Valeur sélectionnée dans le Spinner : {text}")  # Affiche la valeur sélectionnée dans la console
 
+        # Lier l'événement de sélection du Spinner
         self.spinner.bind(text=on_spinner_select)
 
         # Bouton pour ajouter le visage au YML
@@ -852,9 +860,11 @@ class CameraApp(App):
         popup.open()
 
 
+
     def on_stop(self):
         self.capture.release()
 
 
 if __name__ == "__main__":
     CameraApp().run()
+
