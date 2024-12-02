@@ -7,7 +7,7 @@ script_principal = "detec_face.py"
 # Liste des fichiers supplémentaires (fichiers .yml et .dat)
 include_files = [
     'labeled_faces_withCeleb.yml',
-    'lbph_bdd.dat',
+    'lbph_bdd.dat'
 ]
 
 # Configuration de l'exécutable
@@ -22,8 +22,16 @@ setup(
     description="Une application Python convertie en exécutable",
     options={
         "build_exe": {
-            "packages": ["os"],  # Ajoutez ici tous les packages nécessaires (par ex. "cv2", "numpy")
+            "packages": [
+                "os", "kivy", "cv2", "numpy", "deepface", "scipy", "yaml", 
+                "kivy.uix.boxlayout", "kivy.uix.button", "kivy.uix.image", 
+                "kivy.uix.slider", "kivy.uix.label", "kivy.clock", 
+                "kivy.uix.popup", "kivy.uix.filechooser", "kivy.graphics", 
+                "kivy.uix.tabbedpanel", "kivy.uix.dropdown", "kivy.uix.gridlayout", 
+                "kivy.uix.textinput", "kivy.uix.spinner", "kivy.core.window"
+            ],  # Ajoutez ici toutes les bibliothèques nécessaires
             "include_files": include_files,  # Liste des fichiers supplémentaires
+            "include_msvcr": True,  # Inclure les DLL Visual C++ nécessaires
         }
     },
     executables=executables
