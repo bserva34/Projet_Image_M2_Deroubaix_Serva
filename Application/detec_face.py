@@ -564,10 +564,8 @@ class CameraApp(App):
                             labels = [face["label"] for face in self.faces_data_reco_facial]  # Récupérer tous les labels
                             for l in labels:
                                 if (self.check_surveillance(l)):
-                                    print(l)
                                     if l in self.in_progress_labels:
                                         acc = self.in_progress_labels[l]
-                                        print(acc)
                                         if(acc<25):
                                             #self.in_progress_labels(l)=acc+1
                                             labels_progress_acc[l]=acc+1
