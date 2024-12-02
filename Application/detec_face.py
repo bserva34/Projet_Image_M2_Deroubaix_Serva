@@ -262,6 +262,7 @@ class CameraApp(App):
             # Crée ou met à jour l'entrée pour le label dans le YML
             if label not in data:
                 data[label] = []
+                self.list_labels_yml.append(label)
 
             # Ajoute les visages détectés à ce label
             try:
