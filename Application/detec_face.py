@@ -19,6 +19,8 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.image import Image
 from kivy.graphics import Color, Rectangle
 from kivy.uix.textinput import TextInput
+from kivy.uix.spinner import Spinner
+
 
 import cv2
 import numpy as np
@@ -93,6 +95,9 @@ class CameraApp(App):
         # Charger les vecteurs caractéristiques
         self.labeled_faces = self.load_yaml(self.yml_path)
         self.name_lbph, self.vector_lbph = self.load__vectors_lbph("lbph_bdd.dat")
+
+        self.list_labels_yml = list(self.labeled_faces.keys())
+        print(self.list_labels_yml) 
 
         self.initialize_camera()
 
@@ -775,7 +780,7 @@ class CameraApp(App):
 
         # Convertir l'image OpenCV en format que Kivy peut afficher
         face_img_rgb = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)  # Conversion OpenCV -> RGB
-        face_img_rgb = cv2.flip(face_img_rgb,0)
+        face_img_rgb = cv2.flip(face_img_rgb, 0)
 
         # Créer une texture Kivy à partir de l'image RGB
         face_texture = Texture.create(size=(face_img_rgb.shape[1], face_img_rgb.shape[0]), colorfmt='rgb')
@@ -787,28 +792,65 @@ class CameraApp(App):
 
         # Crée un Popup Kivy avec tous les éléments
         popup_layout = BoxLayout(orientation="vertical")
-        popup_layout_btn = BoxLayout(orientation="horizontal", size_hint=(1.0,0.3))
-        popup = Popup(title=f"Labéliser le Visage: ", content=popup_layout, size_hint=(0.5, 0.5))
-        
-        # Crée un input text pour que l'utilisateur entre un label
-        self.label_input = TextInput(hint_text="Entrez un label pour ce visage", multiline=False, size_hint=(1.0,1.0))
-        label_button = Button(text="Ajouter au YML", size_hint=(1, 1.0),background_color=self.Color1,
-            color=(1, 1, 1, 1))
+        popup_layout_btn = BoxLayout(orientation="horizontal", size_hint=(1.0, 0.3))
+        popup = Popup(title=f"Labéliser le Visage: ", content=popup_layout, size_hint=(0.5, 0.7))
+
+        # Crée un Spinner pour afficher les labels existants avec une option supplémentaire
+        labels_with_add_option = ["Ajouter une personne"] + self.list_labels_yml
+        self.spinner = Spinner(
+            text="Sélectionnez un label",  # Texte initial
+            values=labels_with_add_option,  # Liste des options
+            size_hint=(1.0, 1.0)
+        )
+
+        # Zone de texte masquée au départ
+        self.label_input = TextInput(
+            hint_text="Entrez un label pour ce visage",
+            multiline=False,
+            size_hint=(1.0, 1.0),
+            opacity=0,  # Masquer au départ
+            disabled=True
+        )
+
+        # Fonction pour gérer la sélection dans le Spinner
+        def on_spinner_select(spinner, text):
+            if text == "Ajouter une personne":
+                self.label_input.opacity = 1  # Affiche la zone de texte
+                self.label_input.disabled = False
+            else:
+                self.label_input.opacity = 0  # Masque la zone de texte
+                self.label_input.disabled = True
+
+        self.spinner.bind(text=on_spinner_select)
+
+        # Bouton pour ajouter le visage au YML
+        label_button = Button(
+            text="Ajouter au YML",
+            size_hint=(1, 1.0),
+            background_color=self.Color1,
+            color=(1, 1, 1, 1)
+        )
         label_button.bind(on_press=lambda instance: self.add_face_to_yml(face_img, popup))
 
-        # Crée un bouton Quitter pour fermer le popup
-        quit_button = Button(text="Quitter", size_hint=(1, 1.0),background_color=self.Color1,
-            color=(1, 1, 1, 1))
+        # Bouton pour quitter le popup
+        quit_button = Button(
+            text="Quitter",
+            size_hint=(1, 1.0),
+            background_color=self.Color1,
+            color=(1, 1, 1, 1)
+        )
         quit_button.bind(on_press=lambda instance: popup.dismiss())
 
         # Organise tous les éléments dans une BoxLayout
         popup_layout.add_widget(face_widget)  # Affiche l'image du visage
-        popup_layout.add_widget(self.label_input)  # Ajoute l'input texte
+        popup_layout.add_widget(self.spinner)  # Ajoute le Spinner
+        popup_layout.add_widget(self.label_input)  # Ajoute l'input texte (masqué au départ)
         popup_layout_btn.add_widget(quit_button)  # Bouton pour quitter le popup
         popup_layout_btn.add_widget(label_button)  # Bouton pour ajouter le visage au YML
         popup_layout.add_widget(popup_layout_btn)
 
         popup.open()
+
 
     def on_stop(self):
         self.capture.release()
