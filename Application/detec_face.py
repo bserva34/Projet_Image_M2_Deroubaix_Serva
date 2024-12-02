@@ -74,6 +74,7 @@ class CameraApp(App):
         self.surveillance_active = False
         
         self.detected_labels = []
+        self.in_progress_labels = {}
 
         # Layout des images à droite
         self.image_layout = self.create_image_panel()
@@ -548,11 +549,25 @@ class CameraApp(App):
                     
                     if self.surveillance_active:
                         if self.faces_data_reco_facial:
+                            labels_progress_acc={}
                             labels = [face["label"] for face in self.faces_data_reco_facial]  # Récupérer tous les labels
                             for l in labels:
                                 if (self.check_surveillance(l)):
-                                    self.detected_labels.append(l)
-                                    self.take_screenshots(None)
+                                    print(l)
+                                    if l in self.in_progress_labels:
+                                        acc = self.in_progress_labels[l]
+                                        print(acc)
+                                        if(acc<25):
+                                            #self.in_progress_labels(l)=acc+1
+                                            labels_progress_acc[l]=acc+1
+                                        else:
+                                            self.detected_labels.append(l)
+                                            self.take_screenshots(None,l)
+                                    else :
+                                        #self.in_progress_labels(l)=1
+                                        labels_progress_acc[l]=1
+                            self.in_progress_labels=copy.deepcopy(labels_progress_acc)
+                                    
 
                 elif self.lbph_active:
                     current_time = time.time()
@@ -697,20 +712,23 @@ class CameraApp(App):
         texture.blit_buffer(buffer, colorfmt="rgba", bufferfmt="ubyte")
         image_widget.texture = texture
 
-    def take_screenshots(self, instance):
+    def take_screenshots(self, instance, name=None):
         mode = self.screenshot_mode
         folder = "screen" if mode else "surveillance"
         if not os.path.exists(folder):
             os.makedirs(folder)
 
-        
-        # Obtenir tous les labels des visages détectés
-        labels = ["unknown"]
-        if self.faces_data_reco_facial:
-            labels = [face["label"] for face in self.faces_data_reco_facial]  # Récupérer tous les labels
+        label_str=''
+        if(name==None):
+            # Obtenir tous les labels des visages détectés
+            labels = ["unknown"]
+            if self.faces_data_reco_facial:
+                labels = [face["label"] for face in self.faces_data_reco_facial]  # Récupérer tous les labels
 
-        # Créer une chaîne avec tous les labels, séparés par des underscores
-        label_str = "_".join(labels)
+            # Créer une chaîne avec tous les labels, séparés par des underscores
+            label_str = "_".join(labels)
+        else:
+            label_str = name
 
         # Générer un nom de fichier basé sur les labels et l'heure actuelle
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
