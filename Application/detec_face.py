@@ -251,8 +251,8 @@ class CameraApp(App):
             print(f"Erreur lors du chargement du fichier YAML : {e}")
             return {}
 
-    def add_face_to_yml(self, face, popup):
-        label = self.label_input.text.strip()
+    def add_face_to_yml(self, face,label_input, popup):
+        label = label_input.text.strip()
         
         if label:
             # Charge le fichier YAML existant
@@ -803,14 +803,14 @@ class CameraApp(App):
 
         # Crée un Spinner pour afficher les labels existants avec une option supplémentaire
         labels_with_add_option = ["Ajouter une personne"] + self.list_labels_yml
-        self.spinner = Spinner(
+        spinner = Spinner(
             text="Sélectionnez un label",  # Texte initial
             values=labels_with_add_option,  # Liste des options
             size_hint=(1.0, 1.0)
         )
 
         # Zone de texte masquée au départ
-        self.label_input = TextInput(
+        label_input = TextInput(
             hint_text="Entrez un label pour ce visage",
             multiline=False,
             size_hint=(1.0, 1.0),
@@ -821,16 +821,16 @@ class CameraApp(App):
         # Fonction pour gérer la sélection dans le Spinner
         def on_spinner_select(spinner, text):
             if text == "Ajouter une personne":
-                self.label_input.opacity = 1  # Affiche la zone de texte
-                self.label_input.disabled = False
+                label_input.opacity = 1  # Affiche la zone de texte
+                label_input.disabled = False
             else:
-                self.label_input.opacity = 0  # Masque la zone de texte
-                self.label_input.disabled = True
-                self.label_input.text = text
+                label_input.opacity = 0  # Masque la zone de texte
+                label_input.disabled = True
+                label_input.text = text
             print(f"Valeur sélectionnée dans le Spinner : {text}")  # Affiche la valeur sélectionnée dans la console
 
         # Lier l'événement de sélection du Spinner
-        self.spinner.bind(text=on_spinner_select)
+        spinner.bind(text=on_spinner_select)
 
         # Bouton pour ajouter le visage au YML
         label_button = Button(
@@ -839,7 +839,7 @@ class CameraApp(App):
             background_color=self.Color1,
             color=(1, 1, 1, 1)
         )
-        label_button.bind(on_press=lambda instance: self.add_face_to_yml(face_img, popup))
+        label_button.bind(on_press=lambda instance: self.add_face_to_yml(face_img,label_input, popup))
 
         # Bouton pour quitter le popup
         quit_button = Button(
@@ -852,8 +852,8 @@ class CameraApp(App):
 
         # Organise tous les éléments dans une BoxLayout
         popup_layout.add_widget(face_widget)  # Affiche l'image du visage
-        popup_layout.add_widget(self.spinner)  # Ajoute le Spinner
-        popup_layout.add_widget(self.label_input)  # Ajoute l'input texte (masqué au départ)
+        popup_layout.add_widget(spinner)  # Ajoute le Spinner
+        popup_layout.add_widget(label_input)  # Ajoute l'input texte (masqué au départ)
         popup_layout_btn.add_widget(quit_button)  # Bouton pour quitter le popup
         popup_layout_btn.add_widget(label_button)  # Bouton pour ajouter le visage au YML
         popup_layout.add_widget(popup_layout_btn)
