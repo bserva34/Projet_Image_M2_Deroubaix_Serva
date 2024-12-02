@@ -11,6 +11,7 @@ Ce projet implémente une application de reconnaissance faciale utilisant DeepFa
   pip install scipy
   pip install kivy
   pip install pyyaml
+  pip install tensorflow==2.10.0
 ```
 
 ## Application
